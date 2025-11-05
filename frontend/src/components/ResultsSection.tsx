@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Download, CheckCircle, AlertTriangle, XCircle, Clock } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
+import { LoadingAnimation } from './LoadingAnimation'
 import { JobStatus, MeasurementPreview } from '@/types'
 import { formatDate, formatNumber, getValidationStatusColor, getGrowthStatusColor } from '@/lib/utils'
 import { apiClient, downloadFile } from '@/lib/api'
@@ -36,13 +37,13 @@ export function ResultsSection({ jobStatus }: ResultsSectionProps) {
             <span>Memproses Analisis</span>
           </CardTitle>
           <CardDescription>
-            Sistem sedang menganalisis data pertumbuhan anak. Mohon tunggu sebentar.
+            Sistem sedang menganalisis data pertumbuhan anak dengan standar WHO. Mohon tunggu sebentar.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-          </div>
+          <LoadingAnimation
+            isComplete={false}
+          />
         </CardContent>
       </Card>
     )
