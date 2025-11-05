@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException, BackgroundTasks
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, BackgroundTasks, Depends
 from typing import Optional
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,11 +9,16 @@ import logging
 from contextlib import asynccontextmanager
 
 from database import engine, Base
-from models import Job
+from models import Job, User, MasterReference
 from schemas import AnalysisRequest, AnalysisResponse, JobStatus
+from schemas_auth import JobCreateRequest
 from services.analyzer import GrowthAnalyzer
 from services.file_manager import FileManager
+from services.auth_service import auth_service
+from dependencies import get_current_active_user
 from config import settings
+from auth_routes import router as auth_router
+from models import User
 
 # Configure logging
 logging.basicConfig(
@@ -36,6 +41,10 @@ os.makedirs(f"{settings.FILE_STORE}/outputs", exist_ok=True)
 async def lifespan(app: FastAPI):
     # Startup
     Base.metadata.create_all(bind=engine)
+
+    # Create default admin user
+    auth_service.create_default_admin()
+
     logger.info("Application startup completed")
     yield
     # Shutdown
@@ -62,6 +71,9 @@ app.add_middleware(
 file_manager = FileManager()
 analyzer = GrowthAnalyzer()
 
+# Include auth routes
+app.include_router(auth_router)
+
 
 @app.get("/")
 async def root():
@@ -76,24 +88,31 @@ async def health_check():
 @app.post("/api/analyze", response_model=AnalysisResponse)
 async def analyze_data(
     background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_active_user),
     lapangan: UploadFile = File(...),
-    referensi: UploadFile = File(...),
+    referensi: Optional[UploadFile] = File(None),
+    analyzer_name: str = Form(...),
+    analyzer_institution: str = Form(...),
+    master_reference_id: Optional[int] = Form(default=None),
     jenis_kelamin_default: Optional[str] = Form(default="L")
 ):
     """
     Analyze child growth data from uploaded Excel files
     """
     logger.info(f"=== DEBUG: Analyze API called ===")
+    logger.info(f"User: {current_user.username} ({current_user.full_name})")
+    logger.info(f"Analyzer: {analyzer_name} - {analyzer_institution}")
+    logger.info(f"Master Reference ID: {master_reference_id}")
     logger.info(f"jenis_kelamin_default: '{jenis_kelamin_default}'")
     logger.info(f"lapangan.filename: {lapangan.filename}")
-    logger.info(f"referensi.filename: {referensi.filename}")
+    logger.info(f"referensi.filename: {referensi.filename if referensi else 'None'}")
 
     # Validate file types
     if not lapangan.filename.endswith(('.xlsx', '.xls')):
         logger.error(f"Invalid lapangan file type: {lapangan.filename}")
         raise HTTPException(status_code=400, detail="File lapangan harus berformat Excel (.xlsx/.xls)")
 
-    if not referensi.filename.endswith(('.xlsx', '.xls')):
+    if referensi and not referensi.filename.endswith(('.xlsx', '.xls')):
         logger.error(f"Invalid referensi file type: {referensi.filename}")
         raise HTTPException(status_code=400, detail="File referensi harus berformat Excel (.xlsx/.xls)")
 
@@ -105,7 +124,7 @@ async def analyze_data(
             detail=f"File lapangan terlalu besar (max {settings.MAX_UPLOAD_MB}MB)"
         )
 
-    if referensi.size > settings.MAX_UPLOAD_MB * 1024 * 1024:
+    if referensi and referensi.size > settings.MAX_UPLOAD_MB * 1024 * 1024:
         logger.error(f"Referensi file too large: {referensi.size} bytes")
         raise HTTPException(
             status_code=400,
@@ -127,9 +146,34 @@ async def analyze_data(
         # Generate job ID
         job_id = str(uuid.uuid4())
 
-        # Save uploaded files
+        # Determine referensi path
+        referensi_path = None
+        if master_reference_id:
+            # Use master reference file
+            master_ref = MasterReference.get_by_id(master_reference_id)
+            if master_ref:
+                referensi_path = master_ref.file_path
+                logger.info(f"Using master reference: {master_ref.name}")
+            else:
+                logger.error(f"Master reference not found: {master_reference_id}")
+                raise HTTPException(
+                    status_code=400,
+                    detail="Master reference not found"
+                )
+        else:
+            # Use uploaded referensi file
+            if referensi:
+                referensi_path = await file_manager.save_upload_file(referensi, job_id, "referensi")
+                logger.info(f"Using uploaded referensi file: {referensi.filename}")
+            else:
+                logger.error("No referensi file or master reference provided")
+                raise HTTPException(
+                    status_code=400,
+                    detail="Referensi file or master reference is required"
+                )
+
+        # Save lapangan file
         lapangan_path = await file_manager.save_upload_file(lapangan, job_id, "lapangan")
-        referensi_path = await file_manager.save_upload_file(referensi, job_id, "referensi")
 
         logger.info(f"Files saved: lapangan={lapangan_path}, referensi={referensi_path}")
 
@@ -138,7 +182,11 @@ async def analyze_data(
             job_id=job_id,
             default_gender=jenis_kelamin_default,
             lapangan_path=lapangan_path,
-            referensi_path=referensi_path
+            referensi_path=referensi_path,
+            analyzer_name=analyzer_name,
+            analyzer_institution=analyzer_institution,
+            master_reference_id=master_reference_id,
+            created_by=current_user.id
         )
 
         # Run analysis in background

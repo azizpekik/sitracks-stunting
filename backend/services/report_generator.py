@@ -283,11 +283,11 @@ class ReportGenerator:
 
                         # Check for height consistency
                         if measurement.validasi_input == 'ERROR' and 'menurun' in (measurement.keterangan or '').lower():
-                            height_issues.append(measurement.keterangan)
+                            height_issues.append(f"{measurement.keterangan} (Bulan: {measurement.bulan})")
 
                         # Check for weight anomalies
                         if 'Anomali berat' in (measurement.keterangan or ''):
-                            weight_issues.append(measurement.keterangan)
+                            weight_issues.append(f"{measurement.keterangan} (Bulan: {measurement.bulan})")
 
                         # Check for non-ideal measurements
                         if measurement.status_berat == 'Tidak Ideal' or measurement.status_tinggi == 'Tidak Ideal':
@@ -325,9 +325,9 @@ class ReportGenerator:
                         f.write("\nDATA DI LUAR RENTANG IDEAL:\n")
                         for m in non_ideal_measurements:
                             if m.status_berat == 'Tidak Ideal':
-                                f.write(f"- Berat tidak ideal ({m.bulan}): {m.berat}kg\n")
+                                f.write(f"- Berat tidak ideal: {m.berat}kg (Bulan: {m.bulan})\n")
                             if m.status_tinggi == 'Tidak Ideal':
-                                f.write(f"- Tinggi tidak ideal ({m.bulan}): {m.tinggi}cm\n")
+                                f.write(f"- Tinggi tidak ideal: {m.tinggi}cm (Bulan: {m.bulan})\n")
 
                     if warnings:
                         f.write("\nPERINGATAN:\n")

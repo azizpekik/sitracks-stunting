@@ -14,10 +14,12 @@ class FileManager:
         self.base_path = Path("./data")
         self.uploads_path = self.base_path / "uploads"
         self.outputs_path = self.base_path / "outputs"
+        self.master_references_path = self.base_path / "master_references"
 
         # Ensure directories exist
         self.uploads_path.mkdir(parents=True, exist_ok=True)
         self.outputs_path.mkdir(parents=True, exist_ok=True)
+        self.master_references_path.mkdir(parents=True, exist_ok=True)
 
     async def save_upload_file(self, file: UploadFile, job_id: str, file_type: str) -> str:
         """
@@ -92,3 +94,33 @@ class FileManager:
         if os.path.exists(file_path):
             return os.path.getsize(file_path)
         return 0
+
+    async def save_master_reference_file(self, file: UploadFile) -> str:
+        """
+        Save master reference file and return the file path
+        """
+        try:
+            # Generate unique filename with timestamp
+            import time
+            timestamp = int(time.time())
+            file_extension = Path(file.filename).suffix
+            filename = f"master_{timestamp}_{file.filename}"
+            file_path = self.master_references_path / filename
+
+            # Save file
+            async with aiofiles.open(file_path, 'wb') as f:
+                content = await file.read()
+                await f.write(content)
+
+            logger.info(f"Saved master reference file: {file_path}")
+            return str(file_path)
+
+        except Exception as e:
+            logger.error(f"Error saving master reference file: {str(e)}")
+            raise
+
+    def get_master_reference_path(self, filename: str) -> str:
+        """
+        Get master reference file path
+        """
+        return str(self.master_references_path / filename)

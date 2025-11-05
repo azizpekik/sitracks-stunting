@@ -1,15 +1,36 @@
 import Link from 'next/link'
-import { ArrowRight, BarChart3, FileText, Upload, Shield } from 'lucide-react'
+import { ArrowRight, BarChart3, FileText, Upload, Shield, LogIn } from 'lucide-react'
 
 export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="container mx-auto px-4 py-16">
+      {/* Header with Login Button */}
+      <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center">
+              <BarChart3 className="h-8 w-8 text-blue-600" />
+              <h1 className="ml-3 text-2xl font-bold text-gray-900">
+                Sitracking Stunting
+              </h1>
+            </div>
+            <Link
+              href="/login"
+              className="inline-flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+            >
+              <LogIn className="h-4 w-4" />
+              <span>Login Admin</span>
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      <div className="container mx-auto px-4 py-8">
         {/* Hero Section */}
         <div className="text-center mb-16">
-          <h1 className="text-5xl font-bold text-gray-900 mb-6">
-            Sitracking Stunting
-          </h1>
+          <h2 className="text-5xl font-bold text-gray-900 mb-6">
+            Sistem Analisis Data Pertumbuhan Anak
+          </h2>
           <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
             Sistem Web Analisis Ketelitian Data Pertumbuhan Anak (0–2 Tahun) yang
             memvalidasi data dari file Excel dengan tabel referensi pertumbuhan ideal WHO.
