@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Upload</title>
+</head>
+<body>
+    <h1>Test Upload Files</h1>
+    <form id="uploadForm">
+        <div>
+            <label>Lapangan File:</label>
+            <input type="file" id="lapangan" name="lapangan" accept=".xlsx,.xls" required>
+        </div>
+        <br>
+        <div>
+            <label>Referensi File:</label>
+            <input type="file" id="referensi" name="referensi" accept=".xlsx,.xls" required>
+        </div>
+        <br>
+        <div>
+            <label>Jenis Kelamin:</label>
+            <select id="gender" name="jenis_kelamin_default">
+                <option value="L">Laki-laki</option>
+                <option value="P">Perempuan</option>
+            </select>
+        </div>
+        <br>
+        <button type="submit">Upload</button>
+    </form>
+    <div id="result"></div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData();
+            formData.append('lapangan', document.getElementById('lapangan').files[0]);
+            formData.append('referensi', document.getElementById('referensi').files[0]);
+            formData.append('jenis_kelamin_default', document.getElementById('gender').value);
+
+            try {
+                const response = await fetch('http://localhost:8001/api/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                document.getElementById('result').innerHTML = `
+                    <h3>Response:</h3>
+                    <pre>${JSON.stringify(result, null, 2)}</pre>
+                `;
+            } catch (error) {
+                document.getElementById('result').innerHTML = `
+                    <h3>Error:</h3>
+                    <p>${error.message}</p>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>

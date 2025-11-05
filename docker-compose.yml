@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sitracking-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./backend/.env:/app/.env:ro
+    environment:
+      - APP_ENV=production
+      - FILE_STORE=/app/data
+      - MAX_UPLOAD_MB=10
+      - DEFAULT_GENDER=L
+      - DATABASE_URL=sqlite:///./data/sitracking.db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - sitracking-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sitracking-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - sitracking-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: sitracking-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker-compose/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker-compose/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./data:/var/www/data:ro
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+    networks:
+      - sitracking-network
+
+volumes:
+  data:
+    driver: local
+
+networks:
+  sitracking-network:
+    driver: bridge
