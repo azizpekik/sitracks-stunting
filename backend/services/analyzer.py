@@ -94,6 +94,7 @@ class GrowthAnalyzer:
                 job_id=job_id,
                 nik=child_data.get('nik'),
                 nama=child_data['nama_anak'],
+                jenis_kelamin=child_data.get('jenis_kelamin'),
                 tgl_lahir=child_data.get('tgl_lahir')
             )
             db.add(child)
@@ -105,9 +106,13 @@ class GrowthAnalyzer:
             # Sort measurements by age
             measurements.sort(key=lambda x: x.get('umur_bulan', 0))
 
+            # Use child-specific gender, fallback to default if not provided
+            child_gender = child_data.get('jenis_kelamin') or default_gender
+            logger.info(f"Processing {child_data['nama_anak']} with gender: {child_gender}")
+
             # Validate measurements
             validated_measurements = self._validate_child_measurements(
-                measurements, reference_data, default_gender
+                measurements, reference_data, child_gender
             )
 
             # Save measurements

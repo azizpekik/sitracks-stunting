@@ -89,6 +89,7 @@ class Child(Base):
     nik = Column(String(50), nullable=True)
     nama = Column(String(255), nullable=False)
     tgl_lahir = Column(Date, nullable=True)
+    jenis_kelamin = Column(String(10), nullable=True)  # L, P, or NULL
 
     # Relationships
     job = relationship("Job", back_populates="children")

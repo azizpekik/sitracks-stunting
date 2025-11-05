@@ -22,11 +22,14 @@ function AnalysisPageContent() {
     staleTime: 1000,
   })
 
-  const handleFilesSelected = async (files: { lapangan: File; referensi: File; gender: 'L' | 'P' }) => {
+  const handleFilesSelected = async (files: { lapangan: File; referensi: File }) => {
     try {
       console.log('Starting analysis with files:', files)
-      // Start analysis
-      const response = await apiClient.analyzeData(files)
+      // Start analysis - backend will auto-detect gender
+      const response = await apiClient.analyzeData({
+        lapangan: files.lapangan,
+        referensi: files.referensi
+      })
       console.log('Analysis started:', response)
       setCurrentJobId(response.job_id)
     } catch (error) {

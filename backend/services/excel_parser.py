@@ -157,9 +157,27 @@ class ExcelParser:
             long_data = []
 
             for index, row in df.iterrows():
+                # Extract and validate gender from JENIS_KELAMIN column
+                gender = None
+                if 'JENIS_KELAMIN' in df.columns and pd.notna(row.get('JENIS_KELAMIN')):
+                    gender_value = str(row['JENIS_KELAMIN']).strip().upper()
+                    if gender_value in ['L', 'P', 'LAKI-LAKI', 'PEREMPUAN']:
+                        # Normalize gender values
+                        if gender_value in ['LAKI-LAKI']:
+                            gender_value = 'L'
+                        elif gender_value in ['PEREMPUAN']:
+                            gender_value = 'P'
+                        gender = gender_value
+                        logger.info(f"Detected gender for {row['nama_anak']}: {gender}")
+                    else:
+                        logger.warning(f"Invalid gender value '{row['JENIS_KELAMIN']}' for {row['nama_anak']}")
+                else:
+                    logger.info(f"No JENIS_KELAMIN column found or empty for {row['nama_anak']}, will use default gender")
+
                 child_data = {
                     'nama_anak': str(row['nama_anak']).strip(),
                     'nik': str(row.get('NIK', '')).strip() if pd.notna(row.get('NIK')) else None,
+                    'jenis_kelamin': gender,  # Add gender data
                     'tgl_lahir': self._parse_date(row.get('TANGGAL LAHIR')) if 'TANGGAL LAHIR' in df.columns else None,
                     'measurements': []
                 }

@@ -1,4 +1,5 @@
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, BackgroundTasks
+from typing import Optional
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import os
@@ -77,7 +78,7 @@ async def analyze_data(
     background_tasks: BackgroundTasks,
     lapangan: UploadFile = File(...),
     referensi: UploadFile = File(...),
-    jenis_kelamin_default: str = Form(default="L")
+    jenis_kelamin_default: Optional[str] = Form(default="L")
 ):
     """
     Analyze child growth data from uploaded Excel files
@@ -111,12 +112,16 @@ async def analyze_data(
             detail=f"File referensi terlalu besar (max {settings.MAX_UPLOAD_MB}MB)"
         )
 
-    # Validate gender
-    if jenis_kelamin_default not in ["L", "P"]:
+      # Validate gender (only if provided)
+    if jenis_kelamin_default and jenis_kelamin_default not in ["L", "P"]:
         logger.error(f"Invalid gender value: '{jenis_kelamin_default}' - must be 'L' or 'P'")
         raise HTTPException(status_code=400, detail="Jenis kelamin default harus 'L' atau 'P'")
 
     logger.info(f"=== All validations passed ===")
+    if jenis_kelamin_default:
+        logger.info(f"Using default gender: '{jenis_kelamin_default}'")
+    else:
+        logger.info("Auto-detecting gender from Excel file")
 
     try:
         # Generate job ID

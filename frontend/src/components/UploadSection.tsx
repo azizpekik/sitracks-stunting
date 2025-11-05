@@ -5,14 +5,13 @@ import { Upload, FileText, AlertCircle } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 
 interface UploadSectionProps {
-  onFilesSelected: (files: { lapangan: File; referensi: File; gender: 'L' | 'P' }) => void
+  onFilesSelected: (files: { lapangan: File; referensi: File }) => void
   disabled?: boolean
 }
 
 export function UploadSection({ onFilesSelected, disabled = false }: UploadSectionProps) {
   const [lapanganFile, setLapanganFile] = useState<File | null>(null)
   const [referensiFile, setReferensiFile] = useState<File | null>(null)
-  const [gender, setGender] = useState<'L' | 'P'>('L')
 
   const handleFileChange = useCallback((
     file: File | null,
@@ -29,7 +28,6 @@ export function UploadSection({ onFilesSelected, disabled = false }: UploadSecti
     console.log('=== DEBUG: handleProcess called ===')
     console.log('lapanganFile:', lapanganFile)
     console.log('referensiFile:', referensiFile)
-    console.log('gender:', gender)
     console.log('onFilesSelected function:', typeof onFilesSelected)
 
     if (lapanganFile && referensiFile) {
@@ -39,14 +37,13 @@ export function UploadSection({ onFilesSelected, disabled = false }: UploadSecti
         lapanganType: lapanganFile.type,
         referensiFileName: referensiFile.name,
         referensiSize: referensiFile.size,
-        referensiType: referensiFile.type,
-        gender: gender
+        referensiType: referensiFile.type
       })
-      onFilesSelected({ lapangan: lapanganFile, referensi: referensiFile, gender })
+      onFilesSelected({ lapangan: lapanganFile, referensi: referensiFile })
     } else {
       console.log('Files not ready:', { lapanganFile: !!lapanganFile, referensiFile: !!referensiFile })
     }
-  }, [lapanganFile, referensiFile, gender, onFilesSelected])
+  }, [lapanganFile, referensiFile, onFilesSelected])
 
   const isReady = lapanganFile && referensiFile && !disabled
 
@@ -108,22 +105,6 @@ export function UploadSection({ onFilesSelected, disabled = false }: UploadSecti
           </div>
         </div>
 
-        {/* Gender Selection */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Jenis Kelamin Default
-          </label>
-          <select
-            value={gender}
-            onChange={(e) => setGender(e.target.value as 'L' | 'P')}
-            disabled={disabled}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-          >
-            <option value="L">Laki-laki (L)</option>
-            <option value="P">Perempuan (P)</option>
-          </select>
-        </div>
-
         {/* Process Button */}
         <button
           onClick={handleProcess}
@@ -155,9 +136,9 @@ export function UploadSection({ onFilesSelected, disabled = false }: UploadSecti
                   </ul>
                 </li>
                 <li><strong>Tabel Referensi:</strong> Kolom (Umur, BB Ideal (L), PB Ideal (L), BB Ideal (P), PB Ideal (P)) dengan format rentang "min-max"</li>
-                <li><strong>Jenis Kelamin:</strong> Kolom JENIS_KELAMIN wajib diisi dengan nilai "L" (Laki-laki) atau "P" (Perempuan)</li>
+                <li><strong>Jenis Kelamin:</strong> Otomatis terdeteksi dari kolom JENIS_KELAMIN (L/P/Laki-laki/Perempuan)</li>
               </ul>
-              <p className="mt-2 text-xs font-medium">ℹ️ Jika tidak ada kolom JENIS_KELAMIN, gunakan dropdown Jenis Kelamin Default</p>
+              <p className="mt-2 text-xs font-medium">✨ Sistem akan otomatis mendeteksi jenis kelamin per anak dari kolom JENIS_KELAMIN dan menganalisis sesuai standar WHO</p>
             </div>
           </div>
         </div>
