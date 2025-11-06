@@ -18,12 +18,12 @@ export default function LoginPage() {
     setIsLoading(true)
     setError('')
 
-    const success = await login(username, password)
+    const result = await login(username, password)
 
-    if (success) {
+    if (result.success) {
       router.push('/dashboard')
     } else {
-      setError('Username atau password salah. Silakan coba lagi.')
+      setError(result.error || 'Username atau password salah. Silakan coba lagi.')
     }
 
     setIsLoading(false)

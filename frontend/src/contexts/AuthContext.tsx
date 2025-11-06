@@ -12,7 +12,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null
-  login: (username: string, password: string) => Promise<boolean>
+  login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>
   logout: () => void
   isLoading: boolean
   token: string | null
@@ -57,25 +57,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
 
       if (response.ok) {
-        const data = await response.json()
+        try {
+          const data = await response.json()
 
-        // Store token and user
-        setToken(data.access_token)
-        setUser(data.user)
+          // Validate response data
+          if (!data.access_token || !data.user) {
+            console.error('Invalid response data:', data)
+            return { success: false, error: 'Invalid response from server' }
+          }
 
-        // Persist to localStorage
-        localStorage.setItem('auth_token', data.access_token)
-        localStorage.setItem('auth_user', JSON.stringify(data.user))
+          // Store token and user
+          setToken(data.access_token)
+          setUser(data.user)
 
-        return true
+          // Persist to localStorage
+          localStorage.setItem('auth_token', data.access_token)
+          localStorage.setItem('auth_user', JSON.stringify(data.user))
+
+          return { success: true }
+        } catch (parseError) {
+          console.error('Error parsing response:', parseError)
+          return { success: false, error: 'Error parsing server response' }
+        }
       } else {
-        const errorData = await response.json()
-        console.error('Login failed:', errorData)
-        return false
+        try {
+          const errorData = await response.json()
+          console.error('Login failed:', errorData)
+          return { success: false, error: errorData.detail || 'Login failed' }
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError)
+          return { success: false, error: `Login failed: ${response.statusText}` }
+        }
       }
     } catch (error) {
       console.error('Login error:', error)
-      return false
+      return { success: false, error: 'Network error' }
     }
   }
 

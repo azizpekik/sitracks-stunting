@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 # Configuration
 SECRET_KEY = "sitracking_stunting_secret_key_2024"  # In production, use environment variable
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 480  # 8 hours for better user experience
 
 # Password hashing - temporarily using simple hash for testing
 # pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
