@@ -25,9 +25,9 @@ function DashboardAnalyzePageContent() {
       return await response.json()
     },
     enabled: !!currentJobId,
-    refetchInterval: (data) => {
+    refetchInterval: (query) => {
       // Auto-refresh every 1 second while processing for faster error detection
-      return data?.status === 'processing' ? 1000 : false
+      return query.state.data?.status === 'processing' ? 1000 : false
     },
     staleTime: 1000,
   })

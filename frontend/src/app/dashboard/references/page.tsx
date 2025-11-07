@@ -245,7 +245,8 @@ export default function MasterReferencesPage() {
       setTimeout(() => setSuccessMessage(null), 3000)
     } catch (error) {
       console.error('Download error:', error)
-      setErrorMessage(`Gagal mengunduh file: ${error.message}`)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      setErrorMessage(`Gagal mengunduh file: ${errorMessage}`)
       setTimeout(() => setErrorMessage(null), 3000)
     }
   }
