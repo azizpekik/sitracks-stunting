@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const path = require('path')
+
 const nextConfig = {
   output: 'standalone',
   outputFileTracingIncludes: {
@@ -9,7 +11,7 @@ const nextConfig = {
     // Add path mapping support for @/* aliases
     config.resolve.alias = {
       ...config.resolve.alias,
-      '@': './src',
+      '@': path.resolve(__dirname, 'src'),
     }
 
     return config
