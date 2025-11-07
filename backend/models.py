@@ -162,8 +162,10 @@ class Job(Base):
     summary_json = Column(Text)
     excel_path = Column(Text)
     report_path = Column(Text)
+    context_path = Column(Text)  # New field for comprehensive context file
     lapangan_path = Column(Text)
     referensi_path = Column(Text)
+    error_message = Column(Text)  # Store detailed error messages
 
     # New fields for user and institution tracking
     analyzer_name = Column(String(100), nullable=False)  # e.g., "Nur Azis"
@@ -230,21 +232,19 @@ class Job(Base):
         finally:
             db.close()
 
-    def update_status(self, status: str):
+    def update_status(self, status: str, error_message: str = None):
         self.status = status
         self.updated_at = datetime.utcnow()
-        from database import SessionLocal
-        db = SessionLocal()
-        try:
-            db.commit()
-        finally:
-            db.close()
+        if error_message:
+            self.error_message = error_message
 
-    def save_results(self, summary: dict, excel_path: str, report_path: str):
+    def save_results(self, summary: dict, excel_path: str, report_path: str, context_path: str = None):
         self.status = "completed"
         self.summary_json = json.dumps(summary)
         self.excel_path = excel_path
         self.report_path = report_path
+        if context_path:
+            self.context_path = context_path
         self.updated_at = datetime.utcnow()
         from database import SessionLocal
         db = SessionLocal()

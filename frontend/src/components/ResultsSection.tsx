@@ -55,17 +55,34 @@ export function ResultsSection({ jobStatus }: ResultsSectionProps) {
         <CardHeader>
           <CardTitle className="flex items-center space-x-2 text-red-600">
             <XCircle className="h-5 w-5" />
-            <span>Analisis Gagal</span>
+            <span>Validasi Gagal!</span>
           </CardTitle>
           <CardDescription>
-            Terjadi kesalahan saat memproses data Anda.
+            Terjadi kesalahan saat memvalidasi format file Excel Anda.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="bg-red-50 border border-red-200 rounded-md p-4">
-            <p className="text-red-800">
-              {jobStatus.error_message || 'Terjadi kesalahan yang tidak diketahui.'}
-            </p>
+            <div className="flex items-start space-x-2">
+              <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-red-800 font-medium mb-2">
+                  {jobStatus.error_message || 'Format file tidak sesuai. Silakan periksa kembali file Excel Anda.'}
+                </p>
+
+                <div className="mt-3 p-3 bg-white rounded border border-red-200">
+                  <p className="text-sm font-medium text-red-800 mb-2">💡 Tips Perbaikan:</p>
+                  <ul className="text-xs text-red-700 space-y-1">
+                    <li>• Pastikan file berformat Excel (.xlsx atau .xls)</li>
+                    <li>• Kolom wajib: <strong>nama_anak</strong> dan bulan <strong>JANUARI-DESEMBER</strong></li>
+                    <li>• Setiap bulan memiliki subkolom: <strong>TANGGALUKUR, UMUR, BERAT, TINGGI, CARAUKUR</strong></li>
+                    <li>• Tidak ada baris kosong di tengah data anak</li>
+                    <li>• Format tanggal konsisten (DD/MM/YYYY)</li>
+                    <li>• Pastikan data anak tidak duplikat</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

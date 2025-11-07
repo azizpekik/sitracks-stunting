@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { apiClientWithAuth } from '@/lib/api'
+import { apiInterceptor } from '@/lib/api-interceptor'
 import { Upload, FileText, AlertCircle, User } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 
@@ -45,16 +46,8 @@ export function UploadSectionWithAuth({ onFilesSelected, disabled = false, curre
   const { data: masterReferences, isLoading: isLoadingReferences } = useQuery<MasterReference[]>({
     queryKey: ['masterReferences'],
     queryFn: async () => {
-      const token = localStorage.getItem('auth_token')
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8001'
-      const response = await fetch(`${API_BASE_URL}/auth/master-references`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-      if (!response.ok) {
-        throw new Error('Failed to fetch master references')
-      }
+      const response = await apiInterceptor.get(`${API_BASE_URL}/auth/master-references`)
       return response.json()
     },
     enabled: true,

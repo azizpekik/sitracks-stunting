@@ -94,7 +94,7 @@ async def analyze_data(
     analyzer_name: str = Form(...),
     analyzer_institution: str = Form(...),
     master_reference_id: Optional[int] = Form(default=None),
-    jenis_kelamin_default: Optional[str] = Form(default="L")
+    jenis_kelamin_default: Optional[str] = Form(default=None)
 ):
     """
     Analyze child growth data from uploaded Excel files
@@ -107,40 +107,51 @@ async def analyze_data(
     logger.info(f"lapangan.filename: {lapangan.filename}")
     logger.info(f"referensi.filename: {referensi.filename if referensi else 'None'}")
 
-    # Validate file types
-    if not lapangan.filename.endswith(('.xlsx', '.xls')):
-        logger.error(f"Invalid lapangan file type: {lapangan.filename}")
-        raise HTTPException(status_code=400, detail="File lapangan harus berformat Excel (.xlsx/.xls)")
+    try:
+        # Validate file types
+        if not lapangan.filename.endswith(('.xlsx', '.xls')):
+            logger.error(f"Invalid lapangan file type: {lapangan.filename}")
+            raise HTTPException(status_code=400, detail="File lapangan harus berformat Excel (.xlsx/.xls)")
 
-    if referensi and not referensi.filename.endswith(('.xlsx', '.xls')):
-        logger.error(f"Invalid referensi file type: {referensi.filename}")
-        raise HTTPException(status_code=400, detail="File referensi harus berformat Excel (.xlsx/.xls)")
+        if referensi and not referensi.filename.endswith(('.xlsx', '.xls')):
+            logger.error(f"Invalid referensi file type: {referensi.filename}")
+            raise HTTPException(status_code=400, detail="File referensi harus berformat Excel (.xlsx/.xls)")
 
-    # Validate file sizes
-    if lapangan.size > settings.MAX_UPLOAD_MB * 1024 * 1024:
-        logger.error(f"Lapangan file too large: {lapangan.size} bytes")
-        raise HTTPException(
-            status_code=400,
-            detail=f"File lapangan terlalu besar (max {settings.MAX_UPLOAD_MB}MB)"
-        )
+        # Validate file sizes
+        if lapangan.size > settings.MAX_UPLOAD_MB * 1024 * 1024:
+            logger.error(f"Lapangan file too large: {lapangan.size} bytes")
+            raise HTTPException(
+                status_code=400,
+                detail=f"File lapangan terlalu besar (max {settings.MAX_UPLOAD_MB}MB)"
+            )
 
-    if referensi and referensi.size > settings.MAX_UPLOAD_MB * 1024 * 1024:
-        logger.error(f"Referensi file too large: {referensi.size} bytes")
-        raise HTTPException(
-            status_code=400,
-            detail=f"File referensi terlalu besar (max {settings.MAX_UPLOAD_MB}MB)"
-        )
+        if referensi and referensi.size > settings.MAX_UPLOAD_MB * 1024 * 1024:
+            logger.error(f"Referensi file too large: {referensi.size} bytes")
+            raise HTTPException(
+                status_code=400,
+                detail=f"File referensi terlalu besar (max {settings.MAX_UPLOAD_MB}MB)"
+            )
 
-      # Validate gender (only if provided)
-    if jenis_kelamin_default and jenis_kelamin_default not in ["L", "P"]:
-        logger.error(f"Invalid gender value: '{jenis_kelamin_default}' - must be 'L' or 'P'")
-        raise HTTPException(status_code=400, detail="Jenis kelamin default harus 'L' atau 'P'")
+        # Handle empty string as default "A" for auto-detect
+        if jenis_kelamin_default == '':
+            jenis_kelamin_default = 'A'  # 'A' = Auto-detect gender from Excel
 
-    logger.info(f"=== All validations passed ===")
-    if jenis_kelamin_default:
-        logger.info(f"Using default gender: '{jenis_kelamin_default}'")
-    else:
-        logger.info("Auto-detecting gender from Excel file")
+        # Validate gender (only if provided)
+        if jenis_kelamin_default and jenis_kelamin_default not in ["L", "P", "A"]:
+            logger.error(f"Invalid gender value: '{jenis_kelamin_default}' - must be 'L', 'P', or 'A' (auto-detect)")
+            raise HTTPException(status_code=400, detail="Jenis kelamin default harus 'L', 'P', atau 'A' (auto-detect)")
+
+        logger.info(f"=== All validations passed ===")
+        if jenis_kelamin_default == 'A':
+            logger.info("Auto-detecting gender from Excel file")
+        else:
+            logger.info(f"Using default gender: '{jenis_kelamin_default}'")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error during validation: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Validation error: {str(e)}")
 
     try:
         # Generate job ID
@@ -235,7 +246,7 @@ async def download_file(filename: str, job: str):
     """
     Download analysis results
     """
-    if filename not in ["hasil_validasi.xlsx", "laporan_validasi.txt"]:
+    if filename not in ["hasil_validasi.xlsx", "laporan_validasi.txt", "konteks_lengkap.txt"]:
         raise HTTPException(status_code=400, detail="Filename tidak valid")
 
     try:
@@ -245,6 +256,8 @@ async def download_file(filename: str, job: str):
 
         if filename == "hasil_validasi.xlsx":
             file_path = job_record.excel_path
+        elif filename == "konteks_lengkap.txt":
+            file_path = job_record.context_path
         else:
             file_path = job_record.report_path
 

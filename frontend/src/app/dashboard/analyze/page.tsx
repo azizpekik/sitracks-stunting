@@ -2,11 +2,12 @@
 
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import Link from 'next/link'
-import { ArrowLeft, Upload, FileText, AlertTriangle } from 'lucide-react'
+import { Upload, FileText, AlertTriangle } from 'lucide-react'
+import { DashboardHeader } from '@/components/DashboardHeader'
 import { UploadSectionWithAuth } from '@/components/UploadSectionWithAuth'
 import { ResultsSection } from '@/components/ResultsSection'
 import { apiClientWithAuth } from '@/lib/api'
+import { apiInterceptor } from '@/lib/api-interceptor'
 import { JobStatus } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -19,22 +20,14 @@ function DashboardAnalyzePageContent() {
   const { data: jobStatus, error } = useQuery<JobStatus>({
     queryKey: ['jobStatus', currentJobId],
     queryFn: async () => {
-      const token = localStorage.getItem('auth_token')
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8001'
-      const response = await fetch(`${API_BASE_URL}/api/jobs/${currentJobId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-      if (!response.ok) {
-        throw new Error('Failed to get job status')
-      }
-      return response.json()
+      const response = await apiInterceptor.get(`${API_BASE_URL}/api/jobs/${currentJobId}`)
+      return await response.json()
     },
     enabled: !!currentJobId,
     refetchInterval: (data) => {
-      // Auto-refresh every 2 seconds while processing
-      return data?.status === 'processing' ? 2000 : false
+      // Auto-refresh every 1 second while processing for faster error detection
+      return data?.status === 'processing' ? 1000 : false
     },
     staleTime: 1000,
   })
@@ -82,19 +75,11 @@ function DashboardAnalyzePageContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center mb-4">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center space-x-2 text-blue-600 hover:text-blue-700"
-            >
-              <ArrowLeft className="h-5 w-5" />
-              <span>Kembali ke Dashboard</span>
-            </Link>
-          </div>
+      <DashboardHeader currentPage="/dashboard/analyze" />
 
+      <div className="container mx-auto px-4 py-8">
+        {/* Page Header */}
+        <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             Analyze Now
           </h1>

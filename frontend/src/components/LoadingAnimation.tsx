@@ -18,7 +18,7 @@ const loadingSteps: LoadingStep[] = [
     duration: 800
   },
   {
-    id: 'validate',
+    id: 'validate-format',
     label: 'Memvalidasi format file...',
     icon: Shield,
     duration: 1200
@@ -30,7 +30,7 @@ const loadingSteps: LoadingStep[] = [
     duration: 1500
   },
   {
-    id: 'template',
+    id: 'template-check',
     label: 'Checking error template...',
     icon: AlertTriangle,
     duration: 1000
@@ -54,7 +54,7 @@ const loadingSteps: LoadingStep[] = [
     duration: 2000
   },
   {
-    id: 'validate',
+    id: 'validate-hierarchy',
     label: 'Validasi hierarki data...',
     icon: Shield,
     duration: 1500
@@ -76,9 +76,11 @@ const loadingSteps: LoadingStep[] = [
 interface LoadingAnimationProps {
   isComplete: boolean
   onComplete?: () => void
+  hasError?: boolean
+  errorMessage?: string
 }
 
-export function LoadingAnimation({ isComplete, onComplete }: LoadingAnimationProps) {
+export function LoadingAnimation({ isComplete, onComplete, hasError, errorMessage }: LoadingAnimationProps) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set())
 
@@ -104,6 +106,36 @@ export function LoadingAnimation({ isComplete, onComplete }: LoadingAnimationPro
 
     return () => clearTimeout(timer)
   }, [currentStepIndex, isComplete, onComplete])
+
+  if (hasError) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="text-red-500 mb-4">
+            <AlertTriangle className="h-16 w-16 mx-auto" />
+          </div>
+          <h3 className="text-lg font-semibold text-red-700 mb-2">
+            Validasi Gagal!
+          </h3>
+          <p className="text-sm text-red-600 mb-4">
+            {errorMessage || 'Format file tidak sesuai. Silakan periksa kembali file Excel Anda.'}
+          </p>
+          <div className="bg-red-50 border border-red-200 rounded-md p-4 max-w-md mx-auto">
+            <div className="text-left">
+              <p className="text-sm font-medium text-red-800 mb-2">💡 Tips:</p>
+              <ul className="text-xs text-red-700 space-y-1">
+                <li>• Pastikan file berformat Excel (.xlsx atau .xls)</li>
+                <li>• Kolom wajib: nama_anak, JANUARI-DESEMBER</li>
+                <li>• Setiap bulan memiliki: TANGGALUKUR, UMUR, BERAT, TINGGI, CARAUKUR</li>
+                <li>• Tidak ada baris kosong di tengah data</li>
+                <li>• Format tanggal konsisten (DD/MM/YYYY)</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (isComplete && completedSteps.size === loadingSteps.length) {
     return (

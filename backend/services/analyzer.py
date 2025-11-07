@@ -35,11 +35,39 @@ class GrowthAnalyzer:
 
             # Step 1: Parse reference data
             logger.info("Parsing reference data...")
-            reference_data = self.parser.parse_reference_file(referensi_path)
+            try:
+                reference_data = self.parser.parse_reference_file(referensi_path)
+            except Exception as e:
+                logger.error(f"Error parsing reference file: {str(e)}")
+                error_msg = f"Format file referensi tidak valid: {str(e)}"
+                job.update_status("failed", error_msg)
+                db.commit()  # Force immediate commit
+                raise ValueError(error_msg)
 
-            # Step 2: Parse field data
+            # Step 2: Parse field data with immediate error handling
             logger.info("Parsing field data...")
-            field_data = self.parser.parse_field_data(lapangan_path)
+            try:
+                field_data = self.parser.parse_field_data(lapangan_path)
+            except Exception as e:
+                logger.error(f"Error parsing field data: {str(e)}")
+                # Provide user-friendly error message
+                if "Kolom wajib tidak ditemukan" in str(e):
+                    error_msg = f"Format Excel tidak sesuai. {str(e)}"
+                elif "not found" in str(e).lower():
+                    error_msg = f"File Excel tidak ditemukan atau rusak. Silakan upload ulang file yang valid."
+                else:
+                    error_msg = f"Format file data lapangan tidak valid: {str(e)}"
+
+                job.update_status("failed", error_msg)
+                db.commit()  # Force immediate commit
+                raise ValueError(error_msg)
+
+            # Check if field data is empty
+            if not field_data:
+                error_msg = "File data lapangan kosong atau tidak ada data yang valid. Pastikan file memiliki data anak yang akan dianalisis."
+                job.update_status("failed", error_msg)
+                db.commit()  # Force immediate commit
+                raise ValueError(error_msg)
 
             # Step 3: Validate and save data
             logger.info("Validating and saving data...")
@@ -58,22 +86,28 @@ class GrowthAnalyzer:
             job.save_results(
                 summary=summary,
                 excel_path=report_paths['excel'],
-                report_path=report_paths['text']
+                report_path=report_paths['text'],
+                context_path=report_paths['context']
             )
 
             logger.info(f"Analysis completed for job {job_id}")
             logger.info(f"Summary: {summary}")
 
+        except ValueError as e:
+            # Re-raise validation errors with user-friendly messages
+            logger.error(f"Validation error in analysis for job {job_id}: {str(e)}")
+            raise
         except Exception as e:
-            logger.error(f"Error in analysis for job {job_id}: {str(e)}")
+            logger.error(f"Unexpected error in analysis for job {job_id}: {str(e)}")
             # Try to update job status to failed
             try:
                 job = db.query(Job).filter(Job.id == job_id).first()
                 if job:
-                    job.update_status("failed")
+                    job.update_status("failed", f"Terjadi kesalahan saat memproses data: {str(e)}")
+                    db.commit()  # Force immediate commit
             except:
                 pass
-            raise
+            raise ValueError(f"Terjadi kesalahan saat memproses data: {str(e)}")
         finally:
             db.close()
 
@@ -293,7 +327,7 @@ class GrowthAnalyzer:
 
     async def _generate_reports(self, job_id: str, validation_results: Dict, default_gender: str) -> Dict[str, str]:
         """
-        Generate Excel and text reports
+        Generate Excel, text, and context reports
         """
         # Get data from database
         db = SessionLocal()
@@ -308,15 +342,22 @@ class GrowthAnalyzer:
                 excel_path, measurements, default_gender
             )
 
-            # Generate text report
+            # Generate text report (existing report - keep as is)
             text_path = self.file_manager.get_output_path(job_id, "laporan_validasi.txt")
             await self.report_generator.generate_text_report(
                 text_path, measurements, validation_results['summary']
             )
 
+            # Generate comprehensive context report for AI
+            context_path = self.file_manager.get_output_path(job_id, "konteks_lengkap.txt")
+            await self.report_generator.generate_context_report(
+                context_path, measurements, validation_results['summary'], default_gender
+            )
+
             return {
                 'excel': excel_path,
-                'text': text_path
+                'text': text_path,
+                'context': context_path
             }
 
         finally:

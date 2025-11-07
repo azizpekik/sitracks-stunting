@@ -1,6 +1,8 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { handleAuthError } from '@/lib/auth-utils'
+import { apiInterceptor } from '@/lib/api-interceptor'
 
 interface User {
   id: number
@@ -25,6 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
+  
   useEffect(() => {
     // Check for existing session on mount
     const storedToken = localStorage.getItem('auth_token')
@@ -35,6 +38,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const parsedUser = JSON.parse(storedUser)
         setToken(storedToken)
         setUser(parsedUser)
+
+        // Only validate token with server if we have one
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8001'
+        apiInterceptor.get(`${API_BASE_URL}/auth/me`).catch(() => {
+          // If auth check fails, user will be logged out automatically via handleAuthError
+        })
       } catch (error) {
         console.error('Error parsing stored user:', error)
         localStorage.removeItem('auth_token')
@@ -45,16 +54,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false)
   }, [])
 
-  const login = async (username: string, password: string): Promise<boolean> => {
+  const login = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8001'
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, password }),
-      })
+      const response = await apiInterceptor.post(`${API_BASE_URL}/auth/login`, { username, password })
 
       if (response.ok) {
         try {
@@ -71,8 +74,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(data.user)
 
           // Persist to localStorage
-          localStorage.setItem('auth_token', data.access_token)
-          localStorage.setItem('auth_user', JSON.stringify(data.user))
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('auth_token', data.access_token)
+            localStorage.setItem('auth_user', JSON.stringify(data.user))
+          }
 
           return { success: true }
         } catch (parseError) {
@@ -99,9 +104,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
     setToken(null)
 
-    // Remove from localStorage
-    localStorage.removeItem('auth_token')
-    localStorage.removeItem('auth_user')
+    // Use the centralized handleAuthError function for consistency
+    handleAuthError()
   }
 
   const value: AuthContextType = {

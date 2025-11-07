@@ -32,9 +32,11 @@ interface ChatBotProps {
   reportContent: string
   isOpen: boolean
   onToggle: () => void
+  size?: 'normal' | 'wide'
+  onSizeChange?: (size: 'normal' | 'wide') => void
 }
 
-export default function ChatBot({ jobId, jobName, reportContent, isOpen, onToggle }: ChatBotProps) {
+export default function ChatBot({ jobId, jobName, reportContent, isOpen, onToggle, size = 'normal', onSizeChange }: ChatBotProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -88,15 +90,25 @@ Apa yang Anda cari?`,
         return "⚠️ API Key Gemini belum dikonfigurasi. Silakan tambahkan NEXT_PUBLIC_GEMINI_API_KEY di environment variables atau set 'gemini_api_key' di localStorage."
       }
 
+      // Build conversation history for context (last 10 messages to avoid token limit)
+      const conversationHistory = messages
+        .slice(-10) // Take last 10 messages for context
+        .map(msg => `${msg.type === 'user' ? 'User' : 'AI'}: ${msg.content}`)
+        .join('\n')
+
       const contextPrompt = `
 Anda adalah asisten AI yang membantu user menganalisis data pertumbuhan anak.
 
 Data Analisis yang Tersedia:
 ${reportContent}
 
+Riwayat Percakapan Sebelumnya:
+${conversationHistory}
+
 Peran Anda:
 - Membantu user menemukan informasi data yang spesifik
 - Menjawab pertanyaan tentang data dengan ringkas dan jelas
+- Ingat percakapan sebelumnya untuk memberikan konteks yang berkelanjutan
 - Bertanya kembali jika user tidak spesifik dalam permintaannya
 
 Aturan Penting:
@@ -107,6 +119,7 @@ Aturan Penting:
 5. Berikan jawaban yang singkat dan to-the-point
 6. Fokus pada fakta data, bukan opini atau rekomendasi
 7. JANGAN gunakan formatting bold (**), gunakan teks biasa saja
+8. Ingat pertanyaan dan jawaban sebelumnya untuk konteks percakapan
 
 Contoh pendekatan yang benar:
 - User: "Bagaimana data anak-anak?"
@@ -114,9 +127,9 @@ Contoh pendekatan yang benar:
 - User: "Ada anak bermasalah?"
 - AI: "Berdasarkan data, ada X anak yang teridentifikasi memiliki masalah pertumbuhan. Ingin tahu detail anak mana saja?"
 
-Pertanyaan user: "${userMessage}"
+Pertanyaan user terbaru: "${userMessage}"
 
-Berikan jawaban yang FOKUS pada data dan SINGKAT. Jika perlu, tanya balik untuk klarifikasi. JANGAN gunakan formatting bold (**).
+Berikan jawaban yang FOKUS pada data dan SINGKAT. Jika perlu, tanya balik untuk klarifikasi. JANGAN gunakan formatting bold (**). Gunakan konteks percakapan sebelumnya jika relevan.
       `
 
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
@@ -197,6 +210,10 @@ Berikan jawaban yang FOKUS pada data dan SINGKAT. Jika perlu, tanya balik untuk 
       setTimeout(() => {
         setMessages(prev => [...prev, botMessage])
         setIsTyping(false)
+        // Refocus input after bot responds
+        setTimeout(() => {
+          inputRef.current?.focus()
+        }, 100)
       }, 1000)
 
     } catch (error) {
@@ -209,6 +226,10 @@ Berikan jawaban yang FOKUS pada data dan SINGKAT. Jika perlu, tanya balik untuk 
         }
         setMessages(prev => [...prev, errorMessage])
         setIsTyping(false)
+        // Refocus input after error
+        setTimeout(() => {
+          inputRef.current?.focus()
+        }, 100)
       }, 1000)
     }
   }
@@ -236,7 +257,9 @@ Berikan jawaban yang FOKUS pada data dan SINGKAT. Jika perlu, tanya balik untuk 
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-96 max-w-[90vw]">
+    <div className={`fixed bottom-6 right-6 z-50 transition-all duration-300 ${
+      size === 'wide' ? 'w-[80vw] max-w-[80vw]' : 'w-96 max-w-[90vw]'
+    }`}>
       <Card className="shadow-2xl border bg-white">
         {/* Header */}
         <CardHeader className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 rounded-t-lg">
@@ -252,6 +275,17 @@ Berikan jawaban yang FOKUS pada data dan SINGKAT. Jika perlu, tanya balik untuk 
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {onSizeChange && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => onSizeChange(size === 'normal' ? 'wide' : 'normal')}
+                  className="h-8 w-8 p-0 text-white hover:bg-white/20"
+                  title={size === 'normal' ? 'Perlebar' : 'Perkecil'}
+                >
+                  {size === 'normal' ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="ghost"

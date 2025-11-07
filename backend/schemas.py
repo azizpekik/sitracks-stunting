@@ -108,7 +108,7 @@ class JobStatus(BaseModel):
                 summary=summary_data,
                 downloads=downloads_data,
                 preview=preview_data,
-                error_message=None
+                error_message=job.error_message
             )
         finally:
             db.close()

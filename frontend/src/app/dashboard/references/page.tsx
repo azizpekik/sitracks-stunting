@@ -2,13 +2,14 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import Link from 'next/link'
-import { ArrowLeft, Upload, FileText, Plus, Edit, Trash2, Eye, Calendar, User, CheckCircle, AlertTriangle, X, Download } from 'lucide-react'
+import { Upload, FileText, Plus, Edit, Trash2, Eye, Calendar, User, CheckCircle, AlertTriangle, X, Download } from 'lucide-react'
+import { DashboardHeader } from '@/components/DashboardHeader'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { apiClientWithAuth } from '@/lib/api'
+import { apiInterceptor } from '@/lib/api-interceptor'
 import { useAuth } from '@/contexts/AuthContext'
 
 interface MasterReference {
@@ -61,21 +62,8 @@ export default function MasterReferencesPage() {
   const { data: references = [], isLoading, error } = useQuery<MasterReference[]>({
     queryKey: ['masterReferences'],
     queryFn: async () => {
-      if (!token) {
-        throw new Error('No authentication token available')
-      }
-
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8001'
-      const response = await fetch(`${API_BASE_URL}/auth/master-references`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`Failed to fetch master references: ${response.status} - ${errorText}`)
-      }
+      const response = await apiInterceptor.get(`${API_BASE_URL}/auth/master-references`)
       return response.json()
     },
     enabled: !!user && !!token,
@@ -84,23 +72,8 @@ export default function MasterReferencesPage() {
   // Create master reference mutation
   const createReferenceMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      if (!token) {
-        throw new Error('No authentication token available')
-      }
-
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8001'
-      const response = await fetch(`${API_BASE_URL}/auth/master-references`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData,
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`Failed to create master reference: ${response.status} - ${errorText}`)
-      }
+      const response = await apiInterceptor.upload(`${API_BASE_URL}/auth/master-references`, formData)
       return response.json()
     },
     onSuccess: (data) => {
@@ -121,22 +94,8 @@ export default function MasterReferencesPage() {
   // Delete master reference mutation
   const deleteReferenceMutation = useMutation({
     mutationFn: async (id: number) => {
-      if (!token) {
-        throw new Error('No authentication token available')
-      }
-
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8001'
-      const response = await fetch(`${API_BASE_URL}/auth/master-references/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`Failed to delete master reference: ${response.status} - ${errorText}`)
-      }
+      const response = await apiInterceptor.delete(`${API_BASE_URL}/auth/master-references/${id}`)
       return response.json()
     },
     onSuccess: () => {
@@ -157,24 +116,8 @@ export default function MasterReferencesPage() {
   // Update master reference mutation
   const updateReferenceMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: { name: string; description: string } }) => {
-      if (!token) {
-        throw new Error('No authentication token available')
-      }
-
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8001'
-      const response = await fetch(`${API_BASE_URL}/auth/master-references/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`Failed to update master reference: ${response.status} - ${errorText}`)
-      }
+      const response = await apiInterceptor.put(`${API_BASE_URL}/auth/master-references/${id}`, data)
       return response.json()
     },
     onSuccess: () => {
@@ -269,22 +212,14 @@ export default function MasterReferencesPage() {
   }
 
   const handleDownloadReference = async () => {
-    if (!selectedReference || !token) {
+    if (!selectedReference) {
       setErrorMessage('Gagal mengunduh file: data tidak lengkap')
       return
     }
 
     try {
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8001'
-      const response = await fetch(`${API_BASE_URL}/auth/master-references/${selectedReference.id}/download`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error(`Failed to download file: ${response.status}`)
-      }
+      const response = await apiInterceptor.get(`${API_BASE_URL}/auth/master-references/${selectedReference.id}/download`)
 
       // Get filename from Content-Disposition header or use default
       const contentDisposition = response.headers.get('content-disposition')
@@ -327,17 +262,20 @@ export default function MasterReferencesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <DashboardHeader currentPage="/dashboard/references" />
+
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
+        {/* Page Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center space-x-2 text-blue-600 hover:text-blue-700"
-            >
-              <ArrowLeft className="h-5 w-5" />
-              <span>Kembali ke Dashboard</span>
-            </Link>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                Master Table Referensi
+              </h1>
+              <p className="text-gray-600">
+                Kelola tabel referensi standar pertumbuhan anak WHO untuk digunakan dalam analisis.
+              </p>
+            </div>
             <Button
               onClick={() => setShowCreateForm(!showCreateForm)}
               className="flex items-center space-x-2"
@@ -346,13 +284,6 @@ export default function MasterReferencesPage() {
               <span>Master Reference Baru</span>
             </Button>
           </div>
-
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Master Table Referensi
-          </h1>
-          <p className="text-gray-600">
-            Kelola tabel referensi standar pertumbuhan anak WHO untuk digunakan dalam analisis.
-          </p>
         </div>
 
         {/* Success/Error Messages */}

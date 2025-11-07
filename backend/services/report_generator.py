@@ -217,6 +217,204 @@ class ReportGenerator:
             adjusted_width = min(max_length + 2, 50)
             summary_ws.column_dimensions[column_letter].width = adjusted_width
 
+    async def generate_context_report(self, file_path: str, measurements: List[Measurement], summary: Dict, default_gender: str):
+        """
+        Generate comprehensive context report with complete Excel data for AI analysis
+        """
+        try:
+            with open(file_path, 'w', encoding='utf-8') as f:
+                # Write header
+                f.write("KONTEKS LENGKAP DATA ANALISIS PERTUMBUHAN ANAK\n")
+                f.write("=" * 60 + "\n\n")
+                f.write(f"Tanggal Generate: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n")
+                f.write(f"Jenis Kelamin Default: {default_gender}\n\n")
+
+                # Write summary statistics
+                f.write("RINGKASAN STATISTIK\n")
+                f.write("-" * 30 + "\n")
+                f.write(f"Total Anak: {summary['total_anak']}\n")
+                f.write(f"Total Data Pengukuran: {summary['total_records']}\n")
+                f.write(f"Valid (OK): {summary['valid']} ({summary['valid']/summary['total_records']*100:.1f}%)\n")
+                f.write(f"Peringatan (Warning): {summary['warning']} ({summary['warning']/summary['total_records']*100:.1f}%)\n")
+                f.write(f"Error: {summary['error']} ({summary['error']/summary['total_records']*100:.1f}%)\n")
+                f.write(f"Missing Data: {summary['missing']}\n\n")
+
+                # Group measurements by child
+                children_data = {}
+                for measurement in measurements:
+                    if measurement.child_id not in children_data:
+                        children_data[measurement.child_id] = {
+                            'child': measurement.child,
+                            'measurements': []
+                        }
+                    children_data[measurement.child_id]['measurements'].append(measurement)
+
+                f.write("DATA LENGKAP PER ANAK\n")
+                f.write("=" * 50 + "\n\n")
+
+                for child_id, data in children_data.items():
+                    child = data['child']
+                    child_measurements = sorted(data['measurements'], key=lambda x: x.umur_bulan or 0)
+
+                    # Child information
+                    f.write(f"ANAK: {child.nama}\n")
+                    if child.nik:
+                        f.write(f"NIK: {child.nik}\n")
+                    if child.tgl_lahir:
+                        f.write(f"TANGGAL LAHIR: {child.tgl_lahir.strftime('%d/%m/%Y')}\n")
+                    f.write("-" * 40 + "\n\n")
+
+                    # Complete data table for this child
+                    f.write("DATA PENGUKURAN LENGKAP:\n")
+                    f.write("Bulan\t| Tgl Ukur\t| Umur\t| Berat\t| Tinggi\t| Cara Ukur\t| Status Berat\t| Status Tinggi\t| Validasi\t| Keterangan\n")
+                    f.write("-" * 150 + "\n")
+
+                    for measurement in child_measurements:
+                        tgl_ukur = measurement.tgl_ukur.strftime('%d/%m/%Y') if measurement.tgl_ukur else ''
+                        umur = str(measurement.umur_bulan) if measurement.umur_bulan is not None else ''
+                        berat = f"{measurement.berat:.1f}" if measurement.berat is not None else ''
+                        tinggi = f"{measurement.tinggi:.1f}" if measurement.tinggi is not None else ''
+                        cara_ukur = measurement.cara_ukur or ''
+                        status_berat = measurement.status_berat or ''
+                        status_tinggi = measurement.status_tinggi or ''
+                        validasi = measurement.validasi_input or ''
+                        keterangan = measurement.keterangan or ''
+
+                        f.write(f"{measurement.bulan}\t| {tgl_ukur}\t| {umur}\t| {berat}\t| {tinggi}\t| {cara_ukur}\t\t| {status_berat}\t| {status_tinggi}\t| {validasi}\t| {keterangan}\n")
+
+                    f.write("\n" + "=" * 50 + "\n\n")
+
+                # Add detailed analysis section
+                f.write("ANALISIS DETAIL MASALAH PER ANAK\n")
+                f.write("=" * 50 + "\n\n")
+
+                for child_id, data in children_data.items():
+                    child = data['child']
+                    child_measurements = sorted(data['measurements'], key=lambda x: x.umur_bulan or 0)
+
+                    f.write(f"ANAK: {child.nama}\n")
+                    f.write("-" * 30 + "\n")
+
+                    # Analyze measurements for this child
+                    errors = []
+                    warnings = []
+                    missing_months = []
+                    height_issues = []
+                    weight_issues = []
+                    non_ideal_measurements = []
+
+                    previous_age = None
+                    previous_height = None
+                    previous_weight = None
+
+                    for measurement in child_measurements:
+                        # Check for missing data
+                        if measurement.status_berat == 'Missing' or measurement.status_tinggi == 'Missing':
+                            missing_months.append(measurement.bulan)
+
+                        # Check for height consistency
+                        if measurement.validasi_input == 'ERROR' and 'menurun' in (measurement.keterangan or '').lower():
+                            height_issues.append(f"{measurement.keterangan} (Bulan: {measurement.bulan})")
+
+                        # Check for weight anomalies
+                        if 'Anomali berat' in (measurement.keterangan or ''):
+                            weight_issues.append(f"{measurement.keterangan} (Bulan: {measurement.bulan})")
+
+                        # Check for non-ideal measurements
+                        if measurement.status_berat == 'Tidak Ideal' or measurement.status_tinggi == 'Tidak Ideal':
+                            non_ideal_measurements.append(measurement)
+
+                        # Check for age gaps
+                        if previous_age is not None and measurement.umur_bulan is not None:
+                            age_gap = measurement.umur_bulan - previous_age
+                            if age_gap > 1:
+                                warnings.append(f"Gap data: tidak ada pengukuran untuk {age_gap-1} bulan sebelum {measurement.bulan}")
+
+                        # Update previous values
+                        if measurement.umur_bulan is not None:
+                            previous_age = measurement.umur_bulan
+                        if measurement.tinggi is not None:
+                            previous_height = measurement.tinggi
+                        if measurement.berat is not None:
+                            previous_weight = measurement.berat
+
+                    # Write detailed findings
+                    if missing_months:
+                        f.write(f"Data hilang untuk bulan: {', '.join(missing_months)}\n")
+
+                    if height_issues:
+                        f.write("Masalah tinggi badan:\n")
+                        for issue in height_issues:
+                            f.write(f"  - {issue}\n")
+
+                    if weight_issues:
+                        f.write("Anomali berat badan:\n")
+                        for issue in weight_issues:
+                            f.write(f"  - {issue}\n")
+
+                    if non_ideal_measurements:
+                        f.write("Data di luar rentang ideal:\n")
+                        for m in non_ideal_measurements:
+                            if m.status_berat == 'Tidak Ideal':
+                                f.write(f"  - Berat tidak ideal: {m.berat}kg (Bulan: {m.bulan})\n")
+                            if m.status_tinggi == 'Tidak Ideal':
+                                f.write(f"  - Tinggi tidak ideal: {m.tinggi}cm (Bulan: {m.bulan})\n")
+
+                    if warnings:
+                        f.write("Peringatan:\n")
+                        for warning in warnings:
+                            f.write(f"  - {warning}\n")
+
+                    if not (missing_months or height_issues or weight_issues or non_ideal_measurements or warnings):
+                        f.write("Semua data valid ✓\n")
+
+                    f.write("\n")
+
+                # Add summary of all problems
+                f.write("RINGKASAN SEMUA MASALAH\n")
+                f.write("=" * 30 + "\n\n")
+
+                all_errors = []
+                all_warnings = []
+                all_missing = []
+
+                for child_id, data in children_data.items():
+                    child = data['child']
+                    child_measurements = data['measurements']
+
+                    for measurement in child_measurements:
+                        if measurement.validasi_input == 'ERROR':
+                            if measurement.keterangan:
+                                all_errors.append(f"{child.nama}: {measurement.keterangan} (Bulan: {measurement.bulan})")
+                        if measurement.validasi_input == 'WARNING' and measurement.keterangan:
+                            all_warnings.append(f"{child.nama}: {measurement.keterangan} (Bulan: {measurement.bulan})")
+                        if measurement.status_berat == 'Missing' or measurement.status_tinggi == 'Missing':
+                            all_missing.append(f"{child.nama}: Bulan {measurement.bulan}")
+
+                if all_errors:
+                    f.write("SEMUA ERROR:\n")
+                    for error in all_errors:
+                        f.write(f"- {error}\n")
+                    f.write("\n")
+
+                if all_warnings:
+                    f.write("SEMUA WARNING:\n")
+                    for warning in all_warnings:
+                        f.write(f"- {warning}\n")
+                    f.write("\n")
+
+                if all_missing:
+                    f.write("SEMUA DATA MISSING:\n")
+                    for missing in all_missing:
+                        f.write(f"- {missing}\n")
+                    f.write("\n")
+
+            logger.info(f"Context report saved to {file_path}")
+
+        except Exception as e:
+            logger.error(f"Error generating context report: {str(e)}")
+            raise
+
     async def generate_text_report(self, file_path: str, measurements: List[Measurement], summary: Dict):
         """
         Generate descriptive text report per child
