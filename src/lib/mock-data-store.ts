@@ -109,3 +109,89 @@ export function getMasterReferenceById(id: number): MasterReference | null {
   const reference = masterReferences.find(ref => ref.id === id)
   return reference || null
 }
+
+// Jobs storage and operations
+interface Job {
+  id: string
+  analyzer_name: string
+  analyzer_institution: string
+  status: 'processing' | 'completed' | 'failed'
+  created_at: string
+  completed_at?: string
+  summary?: {
+    total_anak: number
+    total_records: number
+    valid: number
+    warning: number
+    error: number
+    missing: number
+  }
+}
+
+let jobs: Job[] = [
+  {
+    id: 'mock-job-1',
+    analyzer_name: 'Nur Azis',
+    analyzer_institution: 'Posyandu Dampit',
+    status: 'completed',
+    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    completed_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    summary: {
+      total_anak: 25,
+      total_records: 300,
+      valid: 280,
+      warning: 15,
+      error: 5,
+      missing: 0
+    }
+  },
+  {
+    id: 'mock-job-2',
+    analyzer_name: 'Admin Test',
+    analyzer_institution: 'Test Institution',
+    status: 'processing',
+    created_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'mock-job-3',
+    analyzer_name: 'Another User',
+    analyzer_institution: 'Another Institution',
+    status: 'failed',
+    created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+  }
+]
+
+export function getJobs(limit: number = 50, offset: number = 0): Job[] {
+  const paginatedJobs = jobs.slice(offset, offset + limit)
+  console.log(`GET jobs: returning ${paginatedJobs.length} jobs (offset: ${offset}, limit: ${limit})`)
+  return paginatedJobs
+}
+
+export function deleteJob(jobId: string): Job | null {
+  const index = jobs.findIndex(job => job.id === jobId)
+
+  if (index === -1) {
+    console.log(`DELETE job: job ${jobId} not found`)
+    return null
+  }
+
+  const deletedJob = jobs.splice(index, 1)[0]
+  console.log(`DELETE job: deleted job ${deletedJob.id} (${deletedJob.analyzer_name})`)
+  console.log(`Total jobs after deletion: ${jobs.length}`)
+
+  return deletedJob
+}
+
+export function addJob(jobData: Omit<Job, 'id' | 'created_at'>): Job {
+  const newJob: Job = {
+    id: 'mock-job-' + Date.now(),
+    created_at: new Date().toISOString(),
+    ...jobData
+  }
+
+  jobs.unshift(newJob) // Add to beginning (newest first)
+  console.log(`ADD job: created job ${newJob.id} (${newJob.analyzer_name})`)
+  console.log(`Total jobs after addition: ${jobs.length}`)
+
+  return newJob
+}

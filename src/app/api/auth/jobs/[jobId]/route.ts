@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { deleteJob } from '@/lib/mock-data-store'
 
 export async function DELETE(
   request: NextRequest,
@@ -10,14 +11,20 @@ export async function DELETE(
     console.log('=== Next.js API Route Delete Job Called ===')
     console.log('Job ID:', jobId)
 
-    // Mock delete operation
-    // In a real implementation, this would delete from a database
+    // Delete job from shared storage
+    const deletedJob = deleteJob(jobId)
 
-    console.log(`Job ${jobId} deleted successfully (mock)`)
+    if (!deletedJob) {
+      return NextResponse.json(
+        { error: 'Job not found' },
+        { status: 404 }
+      )
+    }
 
     return NextResponse.json({
       message: 'Job deleted successfully',
-      job_id: jobId
+      job_id: jobId,
+      deleted_job: deletedJob
     })
 
   } catch (error) {
