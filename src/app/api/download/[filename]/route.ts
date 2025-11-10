@@ -65,53 +65,28 @@ export async function GET(
 }
 
 function generateExcelValidationResults(jobId: string): ArrayBuffer {
-  // Create Excel data with validation results
+  // Generate dynamic Excel data based on job summary
+  // For now, use sample data that can be scaled based on actual analysis
+
+  // Create header row
   const data = [
     ['No', 'NIK', 'Nama Anak', 'Tanggal Lahir', 'Jenis Kelamin',
      'JANUARI_Status', 'JANUARI_Berat', 'JANUARI_Tinggi', 'JANUARI_CaraUkur',
      'FEBRUARI_Status', 'FEBRUARI_Berat', 'FEBRUARI_Tinggi', 'FEBRUARI_CaraUkur',
-     'MARET_Status', 'MARET_Berat', 'MARET_Tinggi', 'MARET_CaraUkur'],
+     'MARET_Status', 'MARET_Berat', 'MARET_Tinggi', 'MARET_CaraUkur']
+  ]
+
+  // Sample data rows - in real implementation, this would come from parsed Excel
+  const sampleRows = [
     ['1', '3507045501220034', 'HAIBA TIA ADIAHRA', '15/01/2022', 'P',
      'Missing', '', '', '', 'Missing', '', '', '', 'Valid', '4.2', '49.5', 'Terlentang'],
     ['2', '3507041703220039', 'M RAYAN ALFATIH', '17/03/2022', 'L',
      'Valid', '3.8', '52.1', 'Terlentang', 'Valid', '4.2', '54.3', 'Terlentang', 'Valid', '4.8', '56.7', 'Terlentang'],
     ['3', '3507046304220003', 'ALIZA NAZILATUS S', '23/04/2022', 'P',
-     'Valid', '3.5', '51.8', 'Terlentang', 'Valid', '4.0', '53.9', 'Terlentang', 'Valid', '4.5', '56.2', 'Terlentang'],
-    ['4', '3507046604220041', 'LAHIBA FAZA', '26/04/2022', 'P',
-     'Valid', '3.6', '52.5', 'Terlentang', 'Valid', '4.1', '54.8', 'Terlentang', 'Valid', '4.7', '57.1', 'Terlentang'],
-    ['5', '3507042508220042', 'HAFIS ABQORI', '25/08/2022', 'L',
-     'Valid', '4.0', '55.2', 'Terlentang', 'Valid', '4.5', '57.6', 'Terlentang', 'Error', '4.2', '56.8', 'Berdiri'],
-    ['6', '3507042709220001', 'ALFARIZI ABDULOH', '27/09/2022', 'L',
-     'Valid', '4.2', '56.8', 'Terlentang', 'Error', '3.9', '55.1', 'Berdiri', 'Valid', '4.8', '58.9', 'Berdiri'],
-    ['7', '3507042610220045', 'M.ALFAREZEL ALFANO', '26/10/2022', 'L',
-     'Valid', '4.3', '57.5', 'Terlentang', 'Valid', '4.9', '60.1', 'Terlentang', 'Error', '4.5', '58.3', 'Berdiri'],
-    ['8', '3507040809220002', 'ATTA FARIS RADEA', '08/09/2022', 'L',
-     'Missing', '', '', '', 'Valid', '4.1', '56.2', 'Terlentang', 'Warning', '4.4', '57.8', 'Terlentang'],
-    ['9', '3507045911220047', 'ZOYA ARUNIKA MASHUDI', '19/11/2022', 'P',
-     'Valid', '4.4', '58.9', 'Terlentang', 'Valid', '5.0', '61.5', 'Terlentang', 'Error', '2.1', '59.2', 'Terlentang'],
-    ['10', '3507040711220001', 'ABRAR AKMAL', '19/11/2022', 'L',
-     'Valid', '4.5', '59.5', 'Terlentang', 'Valid', '5.1', '62.1', 'Terlentang', 'Error', '3.8', '60.3', 'Berdiri'],
-    ['11', '3507042503230050', 'ERWIN BIMA', '25/03/2023', 'L',
-     'Valid', '3.2', '48.5', 'Terlentang', 'Valid', '3.8', '51.2', 'Terlentang', 'Valid', '4.3', '53.8', 'Terlentang'],
-    ['12', '3507045904230051', 'HILYA SAFA RAMADANI', '19/04/2023', 'P',
-     'Valid', '3.5', '50.2', 'Terlentang', 'Error', '3.2', '49.1', 'Terlentang', 'Valid', '4.1', '53.5', 'Terlentang'],
-    ['13', '3507042607230052', 'MOCH.GAVIN ALHAQI', '26/07/2023', 'L',
-     'Missing', '', '', '', 'Warning', '3.6', '50.8', 'Terlentang', 'Warning', '3.9', '52.2', 'Terlentang'],
-    ['14', '3507045909230053', 'SANA SOFATUN', '19/09/2023', 'P',
-     'Valid', '3.8', '52.5', 'Terlentang', 'Warning', '4.0', '53.8', 'Terlentang', 'Valid', '4.5', '56.1', 'Terlentang'],
-    ['15', '3507044110230054', 'LIYA ALODIA', '01/10/2023', 'P',
-     'Valid', '3.7', '51.8', 'Terlentang', 'Warning', '3.9', '52.9', 'Terlentang', 'Missing', '', '', ''],
-    ['16', '3507044910230055', 'AQILLA OKTAVIA PUTRI', '09/10/2023', 'P',
-     'Valid', '3.9', '53.2', 'Terlentang', 'Valid', '4.3', '55.6', 'Terlentang', 'Valid', '4.8', '58.0', 'Terlentang'],
-    ['17', '3507040311230056', 'M.AKSA ANDRIYAN', '03/11/2023', 'L',
-     'Valid', '4.0', '54.1', 'Terlentang', 'Valid', '4.4', '56.5', 'Terlentang', 'Missing', '', '', ''],
-    ['18', '3507044508240058', 'SELENA ATALIA', '05/08/2024', 'P',
-     'Valid', '3.1', '47.8', 'Terlentang', 'Warning', '3.3', '49.2', 'Terlentang', 'Error', '2.9', '47.5', 'Terlentang'],
-    ['19', '3507046708240059', 'RANIA HALIMATUS', '27/08/2024', 'P',
-     'Missing', '', '', '', 'Valid', '3.5', '50.1', 'Terlentang', 'Valid', '4.0', '52.8', 'Terlentang'],
-    ['20', '3507044903240061', 'FAIZTUS ZAHRO', '09/03/2024', 'P',
-     'Missing', '', '', '', 'Valid', '3.4', '48.9', 'Terlentang', 'Missing', '', '', '']
+     'Valid', '3.5', '51.8', 'Terlentang', 'Valid', '4.0', '53.9', 'Terlentang', 'Valid', '4.5', '56.2', 'Terlentang']
   ]
+
+  data.push(...sampleRows)
 
   // Create workbook and worksheet
   const ws = XLSX.utils.aoa_to_sheet(data)
@@ -121,7 +96,7 @@ function generateExcelValidationResults(jobId: string): ArrayBuffer {
   // Generate Excel file
   const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
 
-  console.log(`Generated Excel validation results for job ${jobId}: 20 rows`)
+  console.log(`Generated Excel validation results for job ${jobId}: ${data.length - 1} rows`)
   return excelBuffer
 }
 
