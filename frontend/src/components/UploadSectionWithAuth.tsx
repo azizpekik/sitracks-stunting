@@ -46,7 +46,7 @@ export function UploadSectionWithAuth({ onFilesSelected, disabled = false, curre
   const { data: masterReferences, isLoading: isLoadingReferences } = useQuery<MasterReference[]>({
     queryKey: ['masterReferences'],
     queryFn: async () => {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://$(typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000')'
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000')
       const response = await apiInterceptor.get(`${API_BASE_URL}/auth/master-references`)
       return response.json()
     },

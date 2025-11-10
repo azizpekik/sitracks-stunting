@@ -20,7 +20,7 @@ function DashboardAnalyzePageContent() {
   const { data: jobStatus, error } = useQuery<JobStatus>({
     queryKey: ['jobStatus', currentJobId],
     queryFn: async () => {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://$(typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000')'
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000')
       const response = await apiInterceptor.get(`${API_BASE_URL}/api/jobs/${currentJobId}`)
       return await response.json()
     },
