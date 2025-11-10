@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+// Import shared storage utilities
+import { getMasterReferences, addMasterReference } from '@/lib/mock-data-store'
+
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization')
@@ -15,26 +18,9 @@ export async function GET(request: NextRequest) {
     //   )
     // }
 
-    // Mock master references for now
-    const mockMasterReferences = [
-      {
-        id: 1,
-        name: 'WHO Growth Standards',
-        description: 'Standard WHO growth reference tables',
-        file_name: 'who_standards.xlsx',
-        is_active: true,
-        created_at: new Date().toISOString(),
-        creator: {
-          id: 1,
-          username: 'admin',
-          full_name: 'Administrator',
-          is_active: true,
-          created_at: new Date().toISOString()
-        }
-      }
-    ]
-
-    return NextResponse.json(mockMasterReferences)
+    const masterReferences = getMasterReferences()
+    console.log('GET master references: returning', masterReferences.length, 'items')
+    return NextResponse.json(masterReferences)
 
   } catch (error) {
     console.error('Master references error:', error)
@@ -61,24 +47,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Mock creation response
-    const newMasterReference = {
-      id: Date.now(), // Mock ID
+    // Add to shared storage
+    const newMasterReference = addMasterReference({
       name: name,
       description: description || null,
       file_name: file.name,
-      is_active: true,
-      created_at: new Date().toISOString(),
-      creator: {
-        id: 1,
-        username: 'admin',
-        full_name: 'Administrator',
-        is_active: true,
-        created_at: new Date().toISOString()
-      }
-    }
-
-    console.log('Master reference created:', newMasterReference)
+    })
 
     return NextResponse.json(newMasterReference, { status: 201 })
 

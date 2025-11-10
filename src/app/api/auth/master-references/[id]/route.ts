@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+// Import shared storage utilities
+import { getMasterReferences, updateMasterReference, deleteMasterReference } from '@/lib/mock-data-store'
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -19,26 +22,19 @@ export async function PUT(
       )
     }
 
-    // Mock update response
-    const updatedMasterReference = {
-      id: parseInt(id),
-      name: name,
-      description: description || null,
-      file_name: 'who_standards.xlsx', // Mock file name
-      is_active: true,
-      created_at: new Date().toISOString(),
-      creator: {
-        id: 1,
-        username: 'admin',
-        full_name: 'Administrator',
-        is_active: true,
-        created_at: new Date().toISOString()
-      }
+    const masterReferenceId = parseInt(id)
+    const updatedReference = updateMasterReference(masterReferenceId, { name, description })
+
+    if (!updatedReference) {
+      return NextResponse.json(
+        { error: 'Master reference not found' },
+        { status: 404 }
+      )
     }
 
-    console.log('Master reference updated:', updatedMasterReference)
+    console.log('Master reference updated:', updatedReference)
 
-    return NextResponse.json(updatedMasterReference)
+    return NextResponse.json(updatedReference)
 
   } catch (error) {
     console.error('Update master reference error:', error)
@@ -58,14 +54,21 @@ export async function DELETE(
     console.log('=== Delete Master Reference API Called ===')
     console.log('Master Reference ID:', id)
 
-    // Mock delete operation
-    // In a real implementation, this would delete from a database
+    const masterReferenceId = parseInt(id)
+    const deletedReference = deleteMasterReference(masterReferenceId)
 
-    console.log(`Master reference ${id} deleted successfully (mock)`)
+    if (!deletedReference) {
+      return NextResponse.json(
+        { error: 'Master reference not found' },
+        { status: 404 }
+      )
+    }
+
+    console.log('Master reference deleted:', deletedReference)
 
     return NextResponse.json({
       message: 'Master reference deleted successfully',
-      id: parseInt(id)
+      id: masterReferenceId
     })
 
   } catch (error) {
