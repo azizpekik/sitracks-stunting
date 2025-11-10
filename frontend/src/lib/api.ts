@@ -1,7 +1,7 @@
 import { apiInterceptor } from '@/lib/api-interceptor'
 import { AnalysisRequest, AnalysisResponse, JobStatus } from '@/types'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8001'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000')
 
 export const apiClient = {
   // Analyze data
