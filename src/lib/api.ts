@@ -121,7 +121,7 @@ export const apiClientWithAuth = {
   // Get jobs
   async getJobs(limit: number = 50, offset: number = 0): Promise<any[]> {
     try {
-      const response = await apiInterceptor.get(`${API_BASE_URL}/auth/jobs?limit=${limit}&offset=${offset}`)
+      const response = await apiInterceptor.get(`${API_BASE_URL}/api/auth/jobs?limit=${limit}&offset=${offset}`)
       return await response.json()
     } catch (error: any) {
       console.error('Error fetching jobs:', error)
@@ -132,7 +132,7 @@ export const apiClientWithAuth = {
   // Delete job
   async deleteJob(jobId: string): Promise<any> {
     try {
-      const response = await apiInterceptor.delete(`${API_BASE_URL}/auth/jobs/${jobId}`)
+      const response = await apiInterceptor.delete(`${API_BASE_URL}/api/auth/jobs/${jobId}`)
       return await response.json()
     } catch (error: any) {
       console.error('Error deleting job:', error)
