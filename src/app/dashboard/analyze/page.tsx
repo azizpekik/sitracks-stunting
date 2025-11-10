@@ -81,10 +81,10 @@ function DashboardAnalyzePageContent() {
         {/* Page Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Analyze Now
+            Analisis Data Pertumbuhan Anak
           </h1>
           <p className="text-gray-600">
-            Upload file data lapangan dan referensi untuk memulai analisis pertumbuhan anak dengan standar WHO.
+            Sistem Web Analisis Ketelitian Data Pertumbuhan Anak (0–2 Tahun) dengan validasi otomatis dari file Excel. Upload file data lapangan dan pilih referensi untuk memulai analisis.
           </p>
         </div>
 
