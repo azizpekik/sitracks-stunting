@@ -110,7 +110,7 @@ export const apiClientWithAuth = {
   // Get master references
   async getMasterReferences(): Promise<any[]> {
     try {
-      const response = await apiInterceptor.get(`${API_BASE_URL}/auth/master-references`)
+      const response = await apiInterceptor.get(`${API_BASE_URL}/api/auth/master-references`)
       return await response.json()
     } catch (error: any) {
       console.error('Error fetching master references:', error)
