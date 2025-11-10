@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(parsedUser)
 
         // Only validate token with server if we have one
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8001'
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000')
         apiInterceptor.get(`${API_BASE_URL}/auth/me`).catch(() => {
           // If auth check fails, user will be logged out automatically via handleAuthError
         })
@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8001'
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000')
       const response = await apiInterceptor.post(`${API_BASE_URL}/auth/login`, { username, password })
 
       if (response.ok) {
