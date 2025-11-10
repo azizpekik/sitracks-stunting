@@ -2,14 +2,13 @@
   "version": 2,
   "builds": [
     {
-      "src": "frontend/package.json",
-      "use": "@vercel/next"
-    },
-    {
       "src": "api/index.py",
       "use": "@vercel/python"
     }
   ],
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "outputDirectory": "frontend/.next",
+  "installCommand": "cd frontend && npm install",
   "routes": [
     {
       "src": "/api/(.*)",
@@ -21,6 +20,7 @@
     }
   ],
   "env": {
-    "PYTHON_VERSION": "3.11"
+    "PYTHON_VERSION": "3.11",
+    "NEXT_TELEMETRY_DISABLED": "1"
   }
 }
