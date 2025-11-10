@@ -21,6 +21,23 @@ interface MonthlyData {
   cara_ukur: string
 }
 
+interface ValidationResult {
+  no: number
+  nik: string
+  nama_anak: string
+  tanggal_lahir: string
+  bulan: string
+  tanggal_ukur: string
+  umur: number
+  berat: number
+  tinggi: number
+  cara_ukur: string
+  status_berat: string
+  status_tinggi: string
+  validasi_input: string
+  keterangan: string
+}
+
 async function parseExcelFile(file: File): Promise<ChildData[]> {
   try {
     const buffer = await file.arrayBuffer()
@@ -46,25 +63,32 @@ async function parseExcelFile(file: File): Promise<ChildData[]> {
         bulan_data: []
       }
 
-      // Parse monthly data (JANUARI to DESEMBER)
+      // Parse monthly data (JANUARI to DESEMBER) - looking for month columns
       const months = ['JANUARI', 'FEBRUARI', 'MARET', 'APRIL', 'MEI', 'JUNI',
                      'JULI', 'AGUSTUS', 'SEPTEMBER', 'OKTOBER', 'NOVEMBER', 'DESEMBER']
 
-      for (const month of months) {
-        const monthIndex = headers.findIndex(h => h && h.toString().toUpperCase().includes(month))
-        if (monthIndex !== -1) {
-          const monthlyData: MonthlyData = {
-            bulan: month,
-            tanggal_ukur: row[monthIndex + 1] || '',
-            umur: parseInt(row[monthIndex + 2]) || 0,
-            berat: parseFloat(row[monthIndex + 3]) || 0,
-            tinggi: parseFloat(row[monthIndex + 4]) || 0,
-            cara_ukur: row[monthIndex + 5] || ''
-          }
+      for (let monthIndex = 0; monthIndex < months.length; monthIndex++) {
+        const month = months[monthIndex]
 
-          // Only add if there's actual data
-          if (monthlyData.umur > 0 || monthlyData.berat > 0 || monthlyData.tinggi > 0) {
-            child.bulan_data.push(monthlyData)
+        // Look for month columns in headers (wide format)
+        for (let col = 0; col < headers.length; col++) {
+          const header = headers[col]?.toString().toUpperCase() || ''
+          if (header.includes(month)) {
+            // Found month column, now get the data for this month
+            const monthlyData: MonthlyData = {
+              bulan: month,
+              tanggal_ukur: row[col + 1] || '',
+              umur: parseInt(row[col + 2]) || 0,
+              berat: parseFloat(row[col + 3]) || 0,
+              tinggi: parseFloat(row[col + 4]) || 0,
+              cara_ukur: row[col + 5] || ''
+            }
+
+            // Only add if there's actual data
+            if (monthlyData.umur > 0 || monthlyData.berat > 0 || monthlyData.tinggi > 0) {
+              child.bulan_data.push(monthlyData)
+            }
+            break // Move to next month
           }
         }
       }
@@ -89,49 +113,110 @@ function analyzeChildData(children: ChildData[]) {
   let error = 0
   let missing = 0
 
-  const results = children.map(child => {
-    let childValid = 0
-    let childWarning = 0
-    let childError = 0
-    let childMissing = 0
+  const validationResults: ValidationResult[] = []
+  let currentNo = 1
 
+  children.forEach(child => {
     child.bulan_data.forEach((data, index) => {
       totalRecords++
+
+      // Initialize validation result
+      const result: ValidationResult = {
+        no: currentNo++,
+        nik: child.nik,
+        nama_anak: child.nama_anak,
+        tanggal_lahir: child.tanggal_lahir,
+        bulan: data.bulan,
+        tanggal_ukur: data.tanggal_ukur,
+        umur: data.umur,
+        berat: data.berat,
+        tinggi: data.tinggi,
+        cara_ukur: data.cara_ukur,
+        status_berat: 'Ideal',
+        status_tinggi: 'Ideal',
+        validasi_input: 'OK',
+        keterangan: ''
+      }
 
       // Check for missing data
       if (data.berat === 0 || data.tinggi === 0) {
         missing++
-        childMissing++
+        result.status_berat = 'Missing'
+        result.status_tinggi = 'Missing'
+        result.validasi_input = 'WARNING'
+        result.keterangan = 'Data berat dan tinggi kosong'
+        validationResults.push(result)
         return
       }
 
       // Check for height decrease (error)
       if (index > 0 && data.tinggi < child.bulan_data[index - 1].tinggi) {
         error++
-        childError++
+        result.status_tinggi = 'Tidak Ideal'
+        result.validasi_input = 'ERROR'
+        result.keterangan = `Tinggi menurun: ${child.bulan_data[index - 1].tinggi}cm → ${data.tinggi}cm`
+        validationResults.push(result)
         return
       }
 
       // Check for weight anomaly (>10% decrease) (warning)
       if (index > 0 && data.berat < child.bulan_data[index - 1].berat * 0.9) {
         warning++
-        childWarning++
+        result.status_berat = 'Tidak Ideal'
+        result.validasi_input = 'WARNING'
+        result.keterangan = `Berat turun >10%: ${child.bulan_data[index - 1].berat}kg → ${data.berat}kg`
+        validationResults.push(result)
         return
+      }
+
+      // Check for data gaps (warning)
+      if (index > 0) {
+        const prevMonth = child.bulan_data[index - 1]
+        const currentMonthAge = data.umur
+        const prevMonthAge = prevMonth.umur
+        const ageGap = currentMonthAge - prevMonthAge
+
+        if (ageGap > 1) {
+          warning++
+          result.validasi_input = 'WARNING'
+          result.keterangan = `Gap data: tidak ada pengukuran untuk ${ageGap - 1} bulan sebelum ${data.bulan}`
+          validationResults.push(result)
+          return
+        }
       }
 
       // Default to valid if no issues
       valid++
-      childValid++
+      validationResults.push(result)
     })
 
-    return {
-      nama_anak: child.nama_anak,
-      nik: child.nik,
-      total_data: child.bulan_data.length,
-      valid: childValid,
-      warning: childWarning,
-      error: childError,
-      missing: childMissing
+    // Add missing months for children with gaps
+    if (child.bulan_data.length > 0) {
+      const firstAge = child.bulan_data[0].umur
+      if (firstAge > 1) {
+        // Add missing months before first measurement
+        for (let age = 1; age < firstAge; age++) {
+          totalRecords++
+          missing++
+          const missingResult: ValidationResult = {
+            no: currentNo++,
+            nik: child.nik,
+            nama_anak: child.nama_anak,
+            tanggal_lahir: child.tanggal_lahir,
+            bulan: 'Missing',
+            tanggal_ukur: '',
+            umur: age,
+            berat: 0,
+            tinggi: 0,
+            cara_ukur: '',
+            status_berat: 'Missing',
+            status_tinggi: 'Missing',
+            validasi_input: 'WARNING',
+            keterangan: 'Tidak diukur'
+          }
+          validationResults.push(missingResult)
+        }
+      }
     }
   })
 
@@ -142,7 +227,7 @@ function analyzeChildData(children: ChildData[]) {
     warning,
     error,
     missing,
-    children_details: results
+    validation_results: validationResults
   }
 }
 
@@ -200,8 +285,8 @@ export async function POST(request: NextRequest) {
     console.log(`Analyzing data for ${children.length} children...`)
     const analysis = analyzeChildData(children)
 
-    // Generate job with actual analysis data
-    const newJob = addJob({
+    // Store validation results in job data for download
+    const jobData = {
       analyzer_name: analyzer_name,
       analyzer_institution: analyzer_institution,
       status: 'completed',
@@ -213,8 +298,12 @@ export async function POST(request: NextRequest) {
         warning: analysis.warning,
         error: analysis.error,
         missing: analysis.missing
-      }
-    })
+      },
+      validation_results: analysis.validation_results
+    }
+
+    // Generate job with actual analysis data
+    const newJob = addJob(jobData)
 
     console.log('New analysis job created:', newJob)
 
@@ -222,7 +311,7 @@ export async function POST(request: NextRequest) {
     const response = {
       job_id: newJob.id,
       status: newJob.status,
-      message: 'Analisis selesai. Data telah diproses. (Mock response - Next.js API)',
+      message: 'Analisis selesai. Data telah diproses. (Real data from Excel)',
       summary: newJob.summary
     }
 

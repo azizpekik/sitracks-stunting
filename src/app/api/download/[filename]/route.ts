@@ -65,33 +65,74 @@ export async function GET(
 }
 
 function generateExcelValidationResults(jobId: string): ArrayBuffer {
-  // Generate dynamic Excel data based on job summary
-  // For now, use sample data that can be scaled based on actual analysis
+  // Get the job with validation results
+  const { getJobs } = require('@/lib/mock-data-store')
+  const jobs = getJobs()
+  const job = jobs.find(j => j.id === jobId)
 
-  // Create header row
+  if (!job || !job.validation_results) {
+    // Fallback to empty template if no validation results
+    const data = [
+      ['No', 'NIK', 'Nama Anak', 'Tanggal Lahir', 'Bulan', 'Tanggal Ukur', 'Umur (bulan)', 'Berat (kg)', 'Tinggi (cm)', 'Cara Ukur', 'Status Berat', 'Status Tinggi', 'Validasi Input', 'Keterangan']
+    ]
+
+    const ws = XLSX.utils.aoa_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "Hasil Validasi")
+    return XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+  }
+
+  // Create header row matching the actual format
   const data = [
-    ['No', 'NIK', 'Nama Anak', 'Tanggal Lahir', 'Jenis Kelamin',
-     'JANUARI_Status', 'JANUARI_Berat', 'JANUARI_Tinggi', 'JANUARI_CaraUkur',
-     'FEBRUARI_Status', 'FEBRUARI_Berat', 'FEBRUARI_Tinggi', 'FEBRUARI_CaraUkur',
-     'MARET_Status', 'MARET_Berat', 'MARET_Tinggi', 'MARET_CaraUkur']
+    ['No', 'NIK', 'Nama Anak', 'Tanggal Lahir', 'Bulan', 'Tanggal Ukur', 'Umur (bulan)', 'Berat (kg)', 'Tinggi (cm)', 'Cara Ukur', 'Status Berat', 'Status Tinggi', 'Validasi Input', 'Keterangan']
   ]
 
-  // Sample data rows - in real implementation, this would come from parsed Excel
-  const sampleRows = [
-    ['1', '3507045501220034', 'HAIBA TIA ADIAHRA', '15/01/2022', 'P',
-     'Missing', '', '', '', 'Missing', '', '', '', 'Valid', '4.2', '49.5', 'Terlentang'],
-    ['2', '3507041703220039', 'M RAYAN ALFATIH', '17/03/2022', 'L',
-     'Valid', '3.8', '52.1', 'Terlentang', 'Valid', '4.2', '54.3', 'Terlentang', 'Valid', '4.8', '56.7', 'Terlentang'],
-    ['3', '3507046304220003', 'ALIZA NAZILATUS S', '23/04/2022', 'P',
-     'Valid', '3.5', '51.8', 'Terlentang', 'Valid', '4.0', '53.9', 'Terlentang', 'Valid', '4.5', '56.2', 'Terlentang']
-  ]
+  // Add validation results
+  job.validation_results.forEach(result => {
+    const row = [
+      result.no,
+      result.nik,
+      result.nama_anak,
+      result.tanggal_lahir,
+      result.bulan,
+      result.tanggal_ukur,
+      result.umur,
+      result.berat || '',
+      result.tinggi || '',
+      result.cara_ukur,
+      result.status_berat,
+      result.status_tinggi,
+      result.validasi_input,
+      result.keterangan
+    ]
+    data.push(row)
+  })
 
-  data.push(...sampleRows)
-
-  // Create workbook and worksheet
+  // Create workbook with multiple sheets
   const ws = XLSX.utils.aoa_to_sheet(data)
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, "Hasil Validasi")
+
+  // Add summary sheet
+  const summaryData = [
+    ['Ringkasan Analisis'],
+    [],
+    ['Total Anak', job.summary?.total_anak || 0],
+    ['Total Records', job.summary?.total_records || 0],
+    ['Valid', job.summary?.valid || 0],
+    ['Warning', job.summary?.warning || 0],
+    ['Error', job.summary?.error || 0],
+    ['Missing', job.summary?.missing || 0],
+    [],
+    ['Informasi'],
+    ['Analyzer', job.analyzer_name],
+    ['Institution', job.analyzer_institution],
+    ['Job ID', jobId],
+    ['Tanggal', new Date().toLocaleString('id-ID')]
+  ]
+
+  const wsSummary = XLSX.utils.aoa_to_sheet(summaryData)
+  XLSX.utils.book_append_sheet(wb, wsSummary, "Ringkasan")
 
   // Generate Excel file
   const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
@@ -101,6 +142,33 @@ function generateExcelValidationResults(jobId: string): ArrayBuffer {
 }
 
 function generateTextReport(jobId: string): string {
+  // Get the job with validation results
+  const { getJobs } = require('@/lib/mock-data-store')
+  const jobs = getJobs()
+  const job = jobs.find(j => j.id === jobId)
+
+  if (!job || !job.validation_results) {
+    // Fallback to empty template if no validation results
+    return `LAPORAN VALIDASI DATA PERTUMBUHAN ANAK
+==================================================
+
+Tanggal Generate: ${new Date().toLocaleString('id-ID')}
+
+RINGKASAN ANALISIS
+--------------------
+Total Anak: 0
+Total Data Pengukuran: 0
+Valid (OK): 0
+Peringatan (Warning): 0
+Error: 0
+Missing Data: 0
+
+ANALISIS DETAIL PER ANAK
+==============================
+Tidak ada data untuk dianalisis.
+`
+  }
+
   const currentDate = new Date().toLocaleDateString('id-ID', {
     day: '2-digit',
     month: '2-digit',
@@ -112,278 +180,134 @@ function generateTextReport(jobId: string): string {
     second: '2-digit'
   })
 
-  const reportContent = `LAPORAN VALIDASI DATA PERTUMBUHAN ANAK
+  // Group validation results by child
+  const childGroups: { [key: string]: any[] } = {}
+  job.validation_results.forEach(result => {
+    const key = `${result.nama_anak}|${result.nik}|${result.tanggal_lahir}`
+    if (!childGroups[key]) {
+      childGroups[key] = []
+    }
+    childGroups[key].push(result)
+  })
+
+  let reportContent = `LAPORAN VALIDASI DATA PERTUMBUHAN ANAK
 ==================================================
 
 Tanggal Generate: ${currentDate} ${currentTime}
 
 RINGKASAN ANALISIS
 --------------------
-Total Anak: 20
-Total Data Pengukuran: 180
-Valid (OK): 115 (63.9%)
-Peringatan (Warning): 55 (30.6%)
-Error: 10 (5.6%)
-Missing Data: 11
+Total Anak: ${job.summary?.total_anak || 0}
+Total Data Pengukuran: ${job.summary?.total_records || 0}
+Valid (OK): ${job.summary?.valid || 0}
+Peringatan (Warning): ${job.summary?.warning || 0}
+Error: ${job.summary?.error || 0}
+Missing Data: ${job.summary?.missing || 0}
 
 ANALISIS DETAIL PER ANAK
 ==============================
+`
 
-NAMA: HAIBA TIA ADIAHRA
-NIK: 3507045501220034
-TANGGAL LAHIR: 15/01/2022
---------------------
-Tidak diukur pada bulan: JANUARI, FEBRUARI
+  // Generate detailed analysis for each child
+  Object.values(childGroups).forEach(childData => {
+    const firstResult = childData[0]
 
-==================================================
+    reportContent += `
+NAMA: ${firstResult.nama_anak}
+NIK: ${firstResult.nik}
+TANGGAL LAHIR: ${firstResult.tanggal_lahir}
+--------------------`
 
-NAMA: M RAYAN ALFATIH
-NIK: 3507041703220039
-TANGGAL LAHIR: 17/03/2022
---------------------
-SEMUA DATA VALID ✓
+    // Check for missing months
+    const missingMonths = childData
+      .filter(r => r.validasi_input === 'WARNING' && r.keterangan === 'Tidak diukur')
+      .map(r => r.bulan)
 
-==================================================
+    if (missingMonths.length > 0) {
+      reportContent += `
+Tidak diukur pada bulan: ${missingMonths.join(', ')}`
+    }
 
-NAMA: ALIZA NAZILATUS S
-NIK: 3507046304220003
-TANGGAL LAHIR: 23/04/2022
---------------------
-SEMUA DATA VALID ✓
+    // Check for height issues
+    const heightIssues = childData.filter(r =>
+      r.keterangan.includes('Tinggi menurun')
+    )
 
-==================================================
+    if (heightIssues.length > 0) {
+      reportContent += `
 
-NAMA: LAHIBA FAZA
-NIK: 3507046604220041
-TANGGAL LAHIR: 26/04/2022
---------------------
-Tidak diukur pada bulan: JULI
+MASALAH TINGGI BADAN:`
+      heightIssues.forEach(issue => {
+        reportContent += `
+- ${issue.keterangan}`
+      })
+    }
 
-MASALAH TINGGI BADAN:
-- Tinggi menurun: 86.0cm → 83.0cm
+    // Check for weight issues
+    const weightIssues = childData.filter(r =>
+      r.keterangan.includes('Berat turun')
+    )
 
-==================================================
+    if (weightIssues.length > 0) {
+      reportContent += `
 
-NAMA: HAFIS ABQORI
-NIK: 3507042508220042
-TANGGAL LAHIR: 25/08/2022
---------------------
-Tidak diukur pada bulan: JULI
+MASALAH BERAT BADAN:`
+      weightIssues.forEach(issue => {
+        reportContent += `
+- ${issue.keterangan}`
+      })
+    }
 
-MASALAH TINGGI BADAN:
-- Tinggi menurun: 87.0cm → 85.0cm
+    // Check for gap data
+    const gapIssues = childData.filter(r =>
+      r.keterangan.includes('Gap data')
+    )
 
-==================================================
+    if (gapIssues.length > 0) {
+      reportContent += `
 
-NAMA: ALFARIZI ABDULOH
-NIK: 3507042709220001
-TANGGAL LAHIR: 27/09/2022
---------------------
+PERINGATAN:`
+      gapIssues.forEach(issue => {
+        reportContent += `
+- ${issue.keterangan}`
+      })
+    }
 
-MASALAH TINGGI BADAN:
-- Tinggi menurun: 77.5cm → 76.0cm
+    // Check for missing data
+    const missingDataIssues = childData.filter(r =>
+      r.keterangan.includes('kosong')
+    )
 
-==================================================
+    if (missingDataIssues.length > 0) {
+      reportContent += `
 
-NAMA: M.ALFAREZEL ALFANO
-NIK: 3507042610220045
-TANGGAL LAHIR: 26/10/2022
---------------------
+DATA HILANG:`
+      missingDataIssues.forEach(issue => {
+        reportContent += `
+- ${issue.bulan}: ${issue.keterangan}`
+      })
+    }
 
-MASALAH TINGGI BADAN:
-- Tinggi menurun: 86.4cm → 84.1cm
+    // If no issues, mark as valid
+    const hasIssues = missingMonths.length > 0 ||
+                      heightIssues.length > 0 ||
+                      weightIssues.length > 0 ||
+                      gapIssues.length > 0 ||
+                      missingDataIssues.length > 0
 
-==================================================
+    if (!hasIssues) {
+      reportContent += `
 
-NAMA: ATTA FARIS RADEA
-NIK: 3507040809220002
-TANGGAL LAHIR: 08/09/2022
---------------------
+SEMUA DATA VALID ✓`
+    }
 
-PERINGATAN:
-- Gap data: tidak ada pengukuran untuk 1 bulan sebelum MARET
-- Gap data: tidak ada pengukuran untuk 1 bulan sebelum JULI
+    reportContent += `
 
-==================================================
+==================================================`
+  })
 
-NAMA: ZOYA ARUNIKA MASHUDI
-NIK: 3507045911220047
-TANGGAL LAHIR: 19/11/2022
---------------------
+  reportContent += `
 
-MASALAH TINGGI BADAN:
-- Tinggi menurun: 88.0cm → 8.9cm
-
-==================================================
-
-NAMA: ABRAR AKMAL
-NIK: 3507040711220001
-TANGGAL LAHIR: 19/11/2022
---------------------
-
-MASALAH TINGGI BADAN:
-- Tinggi menurun: 89.0cm → 85.3cm
-
-==================================================
-
-NAMA: ERWIN BIMA
-NIK: 3507042503230050
-TANGGAL LAHIR: 25/03/2023
---------------------
-SEMUA DATA VALID ✓
-
-==================================================
-
-NAMA: HILYA SAFA RAMADANI
-NIK: 3507045904230051
-TANGGAL LAHIR: 19/04/2023
---------------------
-
-MASALAH TINGGI BADAN:
-- Tinggi menurun: 85.9cm → 84.7cm
-
-==================================================
-
-NAMA: MOCH.GAVIN ALHAQI
-NIK: 3507042607230052
-TANGGAL LAHIR: 26/07/2023
---------------------
-Tidak diukur pada bulan: FEBRUARI
-
-DATA DI LUAR RENTANG IDEAL:
-- Tinggi tidak ideal (MARET): 76.0cm
-- Tinggi tidak ideal (APRIL): 76.4cm
-- Tinggi tidak ideal (MEI): 78.0cm
-- Tinggi tidak ideal (JUNI): 78.0cm
-- Tinggi tidak ideal (JULI): 79.0cm
-- Tinggi tidak ideal (AGUSTUS): 79.0cm
-
-==================================================
-
-NAMA: SANA SOFATUN
-NIK: 3507045909230053
-TANGGAL LAHIR: 19/09/2023
---------------------
-
-DATA DI LUAR RENTANG IDEAL:
-- Tinggi tidak ideal (FEBRUARI): 74.5cm
-- Tinggi tidak ideal (JULI): 79.0cm
-
-==================================================
-
-NAMA: LIYA ALODIA
-NIK: 3507044110230054
-TANGGAL LAHIR: 01/10/2023
---------------------
-Tidak diukur pada bulan: MARET
-
-MASALAH TINGGI BADAN:
-- Tinggi menurun: 75.3cm → 74.0cm
-
-DATA DI LUAR RENTANG IDEAL:
-- Berat tidak ideal (JANUARI): 7.3kg
-- Tinggi tidak ideal (JANUARI): 71.0cm
-- Berat tidak ideal (FEBRUARI): 7.0kg
-- Tinggi tidak ideal (FEBRUARI): 72.0cm
-- Berat tidak ideal (APRIL): 7.7kg
-- Tinggi tidak ideal (APRIL): 75.0cm
-- Berat tidak ideal (MEI): 7.6kg
-- Tinggi tidak ideal (MEI): 75.0cm
-- Berat tidak ideal (JUNI): 8.0kg
-- Tinggi tidak ideal (JUNI): 75.2cm
-- Berat tidak ideal (JULI): 7.8kg
-- Tinggi tidak ideal (JULI): 75.3cm
-- Berat tidak ideal (AGUSTUS): 8.0kg
-- Tinggi tidak ideal (AGUSTUS): 74.0cm
-- Berat tidak ideal (SEPTEMBER): 8.6kg
-- Tinggi tidak ideal (SEPTEMBER): 77.0cm
-
-==================================================
-
-NAMA: AQILLA OKTAVIA PUTRI
-NIK: 3507044910230055
-TANGGAL LAHIR: 09/10/2023
---------------------
-
-DATA DI LUAR RENTANG IDEAL:
-- Berat tidak ideal (JANUARI): 8.0kg
-- Tinggi tidak ideal (JANUARI): 71.0cm
-- Berat tidak ideal (FEBRUARI): 8.2kg
-- Tinggi tidak ideal (FEBRUARI): 72.0cm
-- Berat tidak ideal (MARET): 8.2kg
-- Tinggi tidak ideal (MARET): 73.0cm
-- Berat tidak ideal (APRIL): 8.6kg
-- Tinggi tidak ideal (APRIL): 73.0cm
-- Tinggi tidak ideal (MEI): 74.0cm
-- Tinggi tidak ideal (JUNI): 74.0cm
-- Tinggi tidak ideal (JULI): 74.5cm
-- Tinggi tidak ideal (AGUSTUS): 77.8cm
-- Tinggi tidak ideal (SEPTEMBER): 78.2cm
-
-PERINGATAN:
-- Gap data: tidak ada pengukuran untuk 1 bulan sebelum APRIL
-
-==================================================
-
-NAMA: M.AKSA ANDRIYAN
-NIK: 3507040311230056
-TANGGAL LAHIR: 03/11/2023
---------------------
-Tidak diukur pada bulan: JUNI
-
-MASALAH TINGGI BADAN:
-- Gap data: tidak ada pengukuran untuk 1 bulan; Tinggi menurun: 73.5cm → 70.0cm
-
-DATA DI LUAR RENTANG IDEAL:
-- Tinggi tidak ideal (JANUARI): 73.0cm
-- Tinggi tidak ideal (FEBRUARI): 73.0cm
-- Tinggi tidak ideal (MARET): 73.0cm
-- Tinggi tidak ideal (APRIL): 73.4cm
-- Tinggi tidak ideal (MEI): 73.5cm
-- Tinggi tidak ideal (JULI): 70.0cm
-- Tinggi tidak ideal (AGUSTUS): 78.5cm
-- Tinggi tidak ideal (SEPTEMBER): 79.3cm
-
-==================================================
-
-NAMA: SELENA ATALIA
-NIK: 3507044508240058
-TANGGAL LAHIR: 05/08/2024
---------------------
-
-MASALAH TINGGI BADAN:
-- Tinggi menurun: 64.0cm → 63.2cm
-
-DATA DI LUAR RENTANG IDEAL:
-- Tinggi tidak ideal (JANUARI): 61.0cm
-- Tinggi tidak ideal (MARET): 63.2cm
-- Tinggi tidak ideal (MEI): 67.0cm
-- Tinggi tidak ideal (JUNI): 67.5cm
-- Tinggi tidak ideal (JULI): 68.0cm
-- Tinggi tidak ideal (AGUSTUS): 70.0cm
-- Berat tidak ideal (SEPTEMBER): 7.8kg
-- Tinggi tidak ideal (SEPTEMBER): 71.0cm
-
-==================================================
-
-NAMA: RANIA HALIMATUS
-NIK: 3507046708240059
-TANGGAL LAHIR: 27/08/2024
---------------------
-Tidak diukur pada bulan: FEBRUARI
-
-==================================================
-
-NAMA: FAIZTUS ZAHRO
-NIK: 3507044903240061
-TANGGAL LAHIR: 09/03/2024
---------------------
-Tidak diukur pada bulan: MEI, JULI, AGUSTUS
-
-PERINGATAN:
-- Gap data: tidak ada pengukuran untuk 1 bulan sebelum APRIL
-
-==================================================
 `
 
   console.log(`Generated text report for job ${jobId}`)

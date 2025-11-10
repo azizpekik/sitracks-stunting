@@ -111,6 +111,23 @@ export function getMasterReferenceById(id: number): MasterReference | null {
 }
 
 // Jobs storage and operations
+interface ValidationResult {
+  no: number
+  nik: string
+  nama_anak: string
+  tanggal_lahir: string
+  bulan: string
+  tanggal_ukur: string
+  umur: number
+  berat: number
+  tinggi: number
+  cara_ukur: string
+  status_berat: string
+  status_tinggi: string
+  validasi_input: string
+  keterangan: string
+}
+
 interface Job {
   id: string
   analyzer_name: string
@@ -126,6 +143,7 @@ interface Job {
     error: number
     missing: number
   }
+  validation_results?: ValidationResult[]
 }
 
 // Start with empty jobs array - only new analyses will be shown
