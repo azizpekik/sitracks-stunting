@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { jobId: string } }
+  { params }: { params: Promise<{ jobId: string }> }
 ) {
   try {
-    const { jobId } = params
+    const { jobId } = await params
 
     console.log('=== Next.js API Route Job Status Called ===')
     console.log('Job ID:', jobId)
