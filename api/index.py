@@ -1,43 +1,28 @@
-import sys
-import os
+def handler(event, context):
+    """
+    Simple test handler to verify Vercel function works
+    """
+    print("=== Simple Handler Called ===")
+    print(f"Event: {event}")
+    print(f"Context: {context}")
 
-# Add backend to Python path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
+    # Get the path from the event
+    path = event.get('path', '/')
+    method = event.get('httpMethod', 'GET')
 
-# Debug logging
-print("=== API Handler Debug Info ===")
-print(f"Python path: {sys.path}")
-print(f"Current directory: {os.getcwd()}")
-print(f"API directory: {os.path.dirname(__file__)}")
-print("=== End Debug Info ===")
-
-# Import FastAPI app
-try:
-    from main import app
-    print("✓ Successfully imported FastAPI app")
-except ImportError as e:
-    print(f"✗ Failed to import FastAPI app: {e}")
-    # Create a minimal app for testing
-    from fastapi import FastAPI
-    app = FastAPI()
-
-    @app.post("/auth/login")
-    async def login_test():
-        return {"error": f"Import error: {e}"}
-
-# Initialize Mangum adapter once at module level
-try:
-    from mangum import Mangum
-    handler = Mangum(app)
-    print("✓ Successfully initialized Mangum handler")
-except ImportError as e:
-    print(f"✗ Failed to import Mangum: {e}")
-    # If mangum is not available, create a fallback handler
-    def handler(event, context):
+    if path == '/auth/login' and method == 'POST':
         return {
-            "statusCode": 500,
+            "statusCode": 200,
             "headers": {
                 "Content-Type": "application/json",
             },
-            "body": f'{{"error": "Mangum adapter not found. Import error: {e}"}}'
+            "body": '{"message": "Simple test handler works", "path": "' + path + '"}'
         }
+
+    return {
+        "statusCode": 200,
+        "headers": {
+            "Content-Type": "application/json",
+        },
+        "body": '{"message": "Simple test handler works", "path": "' + path + '"}'
+    }
