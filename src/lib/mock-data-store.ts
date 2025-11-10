@@ -137,11 +137,11 @@ let jobs: Job[] = [
     created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
     completed_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
     summary: {
-      total_anak: 25,
-      total_records: 300,
-      valid: 280,
-      warning: 15,
-      error: 5,
+      total_anak: 20,
+      total_records: 240,
+      valid: 180,
+      warning: 42,
+      error: 18,
       missing: 0
     }
   },
