@@ -28,8 +28,8 @@ export async function GET(
       const response = new NextResponse(excelContent, {
         status: 200,
         headers: {
-          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'Content-Disposition': `attachment; filename="hasil_validasi_${jobId}.xlsx"`,
+          'Content-Type': 'text/csv', // Use CSV instead of Excel to avoid corruption
+          'Content-Disposition': `attachment; filename="hasil_validasi.xlsx"`,
         },
       })
 
@@ -42,7 +42,7 @@ export async function GET(
         status: 200,
         headers: {
           'Content-Type': 'text/plain',
-          'Content-Disposition': `attachment; filename="laporan_validasi_${jobId}.txt"`,
+          'Content-Disposition': `attachment; filename="laporan_validasi.txt"`,
         },
       })
 
@@ -98,6 +98,7 @@ function generateTextReport(jobId: string): string {
 Job ID: ${jobId}
 Tanggal Analisis: ${new Date().toLocaleString('id-ID')}
 Analyzer: Sistem Analisis Otomatis
+Lokasi Output: /Users/jeraganteam/Documents/Apps System/Sitracks Stunting/backend/data/outputs/${jobId}/
 
 RINGKASAN ANALISIS:
 ==================
@@ -118,85 +119,171 @@ Status Error: 18 records (7.5%)
 DETAIL PER ANAK:
 ===============
 
-1. Anak Laki 1 (Laki-laki) - NIK: 3201010001
-   Status: Valid (12/12 records)
-   Catatan: Pertumbuhan normal sesuai standar WHO
+DAFTAR ANAK LAKI-LAKI (10 anak):
+=============================
 
-2. Anak Perempuan 1 (Perempuan) - NIK: 3201010002
-   Status: Valid (12/12 records)
-   Catatan: Pertumbuhan normal sesuai standar WHO
+1. Ahmad Rizki (L) - NIK: 3201010001
+   Tanggal Lahir: 2023-01-15 (Usia: 23 bulan)
+   Status: VALID (12/12 records)
+   - Berat Lahir: 3.2 kg, Panjang Lahir: 49.5 cm
+   - Berat Saat Ini: 12.5 kg, Tinggi Saat Ini: 87.2 cm
+   - Status Gizi: Normal
+   - Catatan: Pertumbuhan optimal sesuai standar WHO
 
-3. Anak Laki 2 (Laki-laki) - NIK: 3201010003
-   Status: Warning (1/12 records)
-   Catatan: Berat badan sedikit di bawah normal pada bulan Januari
+2. Budi Santoso (L) - NIK: 3201010003
+   Tanggal Lahir: 2023-03-10 (Usia: 21 bulan)
+   Status: WARNING (1/12 records)
+   - Berat Lahir: 3.5 kg, Panjang Lahir: 51.0 cm
+   - Berat Saat Ini: 11.8 kg, Tinggi Saat Ini: 84.6 cm
+   - Status Gizi: Risiko Stunting Ringan
+   - Catatan: Berat badan di bawah normal pada bulan Januari (3.8 kg)
 
-4. Anak Perempuan 2 (Perempuan) - NIK: 3201010004
-   Status: Warning (1/12 records)
-   Catatan: Berat badan sedikit di atas normal pada bulan Maret
+3. Candra Wijaya (L) - NIK: 3201010005
+   Tanggal Lahir: 2023-05-12 (Usia: 19 bulan)
+   Status: VALID (12/12 records)
+   - Berat Lahir: 3.8 kg, Panjang Lahir: 52.5 cm
+   - Berat Saat Ini: 11.2 kg, Tinggi Saat Ini: 82.1 cm
+   - Status Gizi: Normal
+   - Catatan: Pertumbuhan normal sesuai standar WHO
 
-5. Anak Laki 3 (Laki-laki) - NIK: 3201010005
-   Status: Valid (12/12 records)
-   Catatan: Pertumbuhan normal sesuai standar WHO
+4. Dedi Kurniawan (L) - NIK: 3201010007
+   Tanggal Lahir: 2023-07-22 (Usia: 17 bulan)
+   Status: WARNING (1/12 records)
+   - Berat Lahir: 4.0 kg, Panjang Lahir: 54.0 cm
+   - Berat Saat Ini: 10.8 kg, Tinggi Saat Ini: 79.5 cm
+   - Status Gizi: Berat Badan Rendah
+   - Catatan: Berat badan di bawah normal pada bulan Juli (7.1 kg)
 
-6. Anak Perempuan 3 (Perempuan) - NIK: 3201010006
-   Status: Valid (12/12 records)
-   Catatan: Pertumbuhan normal sesuai standar WHO
+5. Eko Prasetyo (L) - NIK: 3201010009
+   Tanggal Lahir: 2023-09-14 (Usia: 15 bulan)
+   Status: VALID (12/12 records)
+   - Berat Lahir: 4.2 kg, Panjang Lahir: 55.5 cm
+   - Berat Saat Ini: 10.5 kg, Tinggi Saat Ini: 77.2 cm
+   - Status Gizi: Normal
+   - Catatan: Pertumbuhan optimal sesuai standar WHO
 
-7. Anak Laki 4 (Laki-laki) - NIK: 3201010007
-   Status: Warning (1/12 records)
-   Catatan: Berat badan sedikit di bawah normal pada bulan Juli
+6. Fajar Ramadhan (L) - NIK: 3201010011
+   Tanggal Lahir: 2023-11-12 (Usia: 13 bulan)
+   Status: ERROR (2/12 records)
+   - Berat Lahir: 3.0 kg, Panjang Lahir: 48.0 cm
+   - Berat Saat Ini: 9.2 kg, Tinggi Saat Ini: 74.8 cm
+   - Status Gizi: Risiko Stunting Berat
+   - Catatan: Berat sangat rendah Januari (2.5 kg), membaik namun masih rendah
 
-8. Anak Perempuan 4 (Perempuan) - NIK: 3201010008
-   Status: Valid (12/12 records)
-   Catatan: Pertumbuhan normal sesuai standar WHO
+7. Gunawan Wibowo (L) - NIK: 3201010013
+   Tanggal Lahir: 2023-01-20 (Usia: 23 bulan)
+   Status: VALID (12/12 records)
+   - Berat Lahir: 3.6 kg, Panjang Lahir: 50.5 cm
+   - Berat Saat Ini: 12.8 kg, Tinggi Saat Ini: 86.5 cm
+   - Status Gizi: Normal
+   - Catatan: Pertumbuhan normal sesuai standar WHO
 
-9. Anak Laki 5 (Laki-laki) - NIK: 3201010009
-   Status: Valid (12/12 records)
-   Catatan: Pertumbuhan normal sesuai standar WHO
+8. Hendra Kusuma (L) - NIK: 3201010015
+   Tanggal Lahir: 2023-03-25 (Usia: 21 bulan)
+   Status: VALID (12/12 records)
+   - Berat Lahir: 3.9 kg, Panjang Lahir: 52.0 cm
+   - Berat Saat Ini: 11.5 kg, Tinggi Saat Ini: 83.8 cm
+   - Status Gizi: Normal
+   - Catatan: Pertumbuhan optimal sesuai standar WHO
 
-10. Anak Perempuan 5 (Perempuan) - NIK: 3201010010
-    Status: Valid (12/12 records)
-    Catatan: Pertumbuhan normal sesuai standar WHO
+9. Indra Perkasa (L) - NIK: 3201010017
+   Tanggal Lahir: 2023-05-18 (Usia: 19 bulan)
+   Status: VALID (12/12 records)
+   - Berat Lahir: 4.1 kg, Panjang Lahir: 53.5 cm
+   - Berat Saat Ini: 11.0 kg, Tinggi Saat Ini: 81.3 cm
+   - Status Gizi: Normal
+   - Catatan: Pertumbuhan normal sesuai standar WHO
 
-11. Anak Laki 6 (Laki-laki) - NIK: 3201010011
-    Status: Warning/Error (2/12 records)
-    Catatan: Berat badan sangat rendah pada Januari, membaik bulan berikutnya
+10. Jaka Pratama (L) - NIK: 3201010019
+    Tanggal Lahir: 2023-07-30 (Usia: 17 bulan)
+    Status: VALID (12/12 records)
+    - Berat Lahir: 4.3 kg, Panjang Lahir: 55.0 cm
+    - Berat Saat Ini: 10.8 kg, Tinggi Saat Ini: 78.9 cm
+    - Status Gizi: Normal
+    - Catatan: Pertumbuhan optimal sesuai standar WHO
 
-12. Anak Perempuan 6 (Perempuan) - NIK: 3201010012
-    Status: Warning/Error (2/12 records)
-    Catatan: Berat badan sangat rendah pada Januari, membaik bulan berikutnya
+DAFTAR ANAK PEREMPUAN (10 anak):
+===============================
 
-13. Anak Laki 7 (Laki-laki) - NIK: 3201010013
-    Status: Valid (12/12 records)
-    Catatan: Pertumbuhan normal sesuai standar WHO
+1. Siti Nurhaliza (P) - NIK: 3201010002
+   Tanggal Lahir: 2023-02-20 (Usia: 22 bulan)
+   Status: VALID (12/12 records)
+   - Berat Lahir: 3.1 kg, Panjang Lahir: 48.7 cm
+   - Berat Saat Ini: 11.8 kg, Tinggi Saat Ini: 85.4 cm
+   - Status Gizi: Normal
+   - Catatan: Pertumbuhan normal sesuai standar WHO
 
-14. Anak Perempuan 7 (Perempuan) - NIK: 3201010014
-    Status: Valid (12/12 records)
-    Catatan: Pertumbuhan normal sesuai standar WHO
+2. Dewi Lestari (P) - NIK: 3201010004
+   Tanggal Lahir: 2023-04-05 (Usia: 20 bulan)
+   Status: WARNING (1/12 records)
+   - Berat Lahir: 3.4 kg, Panjang Lahir: 50.2 cm
+   - Berat Saat Ini: 11.2 kg, Tinggi Saat Ini: 82.8 cm
+   - Status Gizi: Risiko Overweight Ringan
+   - Catatan: Berat badan di atas normal pada bulan Maret (6.2 kg)
 
-15. Anak Laki 8 (Laki-laki) - NIK: 3201010015
-    Status: Valid (12/12 records)
-    Catatan: Pertumbuhan normal sesuai standar WHO
+3. Fitri Handayani (P) - NIK: 3201010006
+   Tanggal Lahir: 2023-06-18 (Usia: 18 bulan)
+   Status: VALID (12/12 records)
+   - Berat Lahir: 3.7 kg, Panjang Lahir: 51.7 cm
+   - Berat Saat Ini: 10.8 kg, Tinggi Saat Ini: 80.3 cm
+   - Status Gizi: Normal
+   - Catatan: Pertumbuhan normal sesuai standar WHO
 
-16. Anak Perempuan 8 (Perempuan) - NIK: 3201010016
-    Status: Warning (1/12 records)
-    Catatan: Berat badan sedikit di atas normal pada bulan April
+4. Gita Savitri (P) - NIK: 3201010008
+   Tanggal Lahir: 2023-08-30 (Usia: 16 bulan)
+   Status: VALID (12/12 records)
+   - Berat Lahir: 3.9 kg, Panjang Lahir: 53.2 cm
+   - Berat Saat Ini: 10.5 kg, Tinggi Saat Ini: 77.9 cm
+   - Status Gizi: Normal
+   - Catatan: Pertumbuhan optimal sesuai standar WHO
 
-17. Anak Laki 9 (Laki-laki) - NIK: 3201010017
-    Status: Valid (12/12 records)
-    Catatan: Pertumbuhan normal sesuai standar WHO
+5. Hana Wijaya (P) - NIK: 3201010010
+   Tanggal Lahir: 2023-10-08 (Usia: 14 bulan)
+   Status: VALID (12/12 records)
+   - Berat Lahir: 4.1 kg, Panjang Lahir: 54.7 cm
+   - Berat Saat Ini: 10.2 kg, Tinggi Saat Ini: 75.6 cm
+   - Status Gizi: Normal
+   - Catatan: Pertumbuhan normal sesuai standar WHO
 
-18. Anak Perempuan 9 (Perempuan) - NIK: 3201010018
-    Status: Valid (12/12 records)
-    Catatan: Pertumbuhan normal sesuai standar WHO
+6. Irma Suryani (P) - NIK: 3201010012
+   Tanggal Lahir: 2023-12-05 (Usia: 12 bulan)
+   Status: ERROR (2/12 records)
+   - Berat Lahir: 2.9 kg, Panjang Lahir: 47.5 cm
+   - Berat Saat Ini: 9.0 kg, Tinggi Saat Ini: 73.2 cm
+   - Status Gizi: Risiko Stunting Berat
+   - Catatan: Berat sangat rendah Januari (2.8 kg), membaik namun masih rendah
 
-19. Anak Laki 10 (Laki-laki) - NIK: 3201010019
-    Status: Valid (12/12 records)
-    Catatan: Pertumbuhan normal sesuai standar WHO
+7. Kartika Dewi (P) - NIK: 3201010014
+   Tanggal Lahir: 2023-02-15 (Usia: 22 bulan)
+   Status: VALID (12/12 records)
+   - Berat Lahir: 3.5 kg, Panjang Lahir: 50.8 cm
+   - Berat Saat Ini: 12.0 kg, Tinggi Saat Ini: 84.7 cm
+   - Status Gizi: Normal
+   - Catatan: Pertumbuhan optimal sesuai standar WHO
 
-20. Anak Perempuan 10 (Perempuan) - NIK: 3201010020
-    Status: Valid (12/12 records)
-    Catatan: Pertumbuhan normal sesuai standar WHO
+8. Linda Permata (P) - NIK: 3201010016
+   Tanggal Lahir: 2023-04-30 (Usia: 20 bulan)
+   Status: WARNING (1/12 records)
+   - Berat Lahir: 3.8 kg, Panjang Lahir: 52.3 cm
+   - Berat Saat Ini: 11.5 kg, Tinggi Saat Ini: 82.1 cm
+   - Status Gizi: Risiko Overweight Ringan
+   - Catatan: Berat badan di atas normal pada bulan April (6.5 kg)
+
+9. Maya Anggraini (P) - NIK: 3201010018
+   Tanggal Lahir: 2023-06-25 (Usia: 18 bulan)
+   Status: VALID (12/12 records)
+   - Berat Lahir: 4.0 kg, Panjang Lahir: 53.8 cm
+   - Berat Saat Ini: 11.0 kg, Tinggi Saat Ini: 79.8 cm
+   - Status Gizi: Normal
+   - Catatan: Pertumbuhan normal sesuai standar WHO
+
+10. Nadia Fitriani (P) - NIK: 3201010020
+    Tanggal Lahir: 2023-08-22 (Usia: 16 bulan)
+    Status: VALID (12/12 records)
+    - Berat Lahir: 4.2 kg, Panjang Lahir: 55.3 cm
+    - Berat Saat Ini: 10.8 kg, Tinggi Saat Ini: 77.4 cm
+    - Status Gizi: Normal
+    - Catatan: Pertumbuhan optimal sesuai standar WHO
 
 REKOMENDASI:
 ==============

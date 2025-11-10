@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { addJob } from '@/lib/mock-data-store'
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,17 +41,31 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate mock job ID
-    const job_id = 'mock-job-' + Math.random().toString(36).substr(2, 9)
+    // Generate job with proper analysis data
+    const newJob = addJob({
+      analyzer_name: analyzer_name,
+      analyzer_institution: analyzer_institution,
+      status: 'completed', // Mark as completed immediately for demo
+      completed_at: new Date().toISOString(),
+      summary: {
+        total_anak: 20, // Correct count: 10 L + 10 P
+        total_records: 240, // 12 months × 20 children
+        valid: 180, // 75% valid
+        warning: 42, // 17.5% warning
+        error: 18, // 7.5% error
+        missing: 0
+      }
+    })
 
-    // Mock successful analysis response
+    console.log('New analysis job created:', newJob)
+
+    // Return response with job ID
     const response = {
-      job_id: job_id,
-      status: 'processing',
-      message: 'Analisis dimulai. Gunakan job_id untuk mengecek status. (Mock response - Next.js API)'
+      job_id: newJob.id,
+      status: newJob.status,
+      message: 'Analisis selesai. Data telah diproses. (Mock response - Next.js API)',
+      summary: newJob.summary
     }
-
-    console.log('Mock analysis started:', response)
 
     return NextResponse.json(response)
 
