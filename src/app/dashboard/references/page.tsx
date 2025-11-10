@@ -63,7 +63,7 @@ export default function MasterReferencesPage() {
     queryKey: ['masterReferences'],
     queryFn: async () => {
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000')
-      const response = await apiInterceptor.get(`${API_BASE_URL}/auth/master-references`)
+      const response = await apiInterceptor.get(`${API_BASE_URL}/api/auth/master-references`)
       return response.json()
     },
     enabled: !!user && !!token,
@@ -73,7 +73,7 @@ export default function MasterReferencesPage() {
   const createReferenceMutation = useMutation({
     mutationFn: async (formData: FormData) => {
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000')
-      const response = await apiInterceptor.upload(`${API_BASE_URL}/auth/master-references`, formData)
+      const response = await apiInterceptor.upload(`${API_BASE_URL}/api/auth/master-references`, formData)
       return response.json()
     },
     onSuccess: (data) => {
@@ -95,7 +95,7 @@ export default function MasterReferencesPage() {
   const deleteReferenceMutation = useMutation({
     mutationFn: async (id: number) => {
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000')
-      const response = await apiInterceptor.delete(`${API_BASE_URL}/auth/master-references/${id}`)
+      const response = await apiInterceptor.delete(`${API_BASE_URL}/api/auth/master-references/${id}`)
       return response.json()
     },
     onSuccess: () => {
@@ -117,7 +117,7 @@ export default function MasterReferencesPage() {
   const updateReferenceMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: { name: string; description: string } }) => {
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000')
-      const response = await apiInterceptor.put(`${API_BASE_URL}/auth/master-references/${id}`, data)
+      const response = await apiInterceptor.put(`${API_BASE_URL}/api/auth/master-references/${id}`, data)
       return response.json()
     },
     onSuccess: () => {
@@ -219,7 +219,7 @@ export default function MasterReferencesPage() {
 
     try {
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000')
-      const response = await apiInterceptor.get(`${API_BASE_URL}/auth/master-references/${selectedReference.id}/download`)
+      const response = await apiInterceptor.get(`${API_BASE_URL}/api/auth/master-references/${selectedReference.id}/download`)
 
       // Get filename from Content-Disposition header or use default
       const contentDisposition = response.headers.get('content-disposition')
