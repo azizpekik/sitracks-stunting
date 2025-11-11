@@ -2,7 +2,7 @@
 // Following analyze.md specifications for proper date handling
 
 export interface NormalizedDate {
-  originalValue: string | number | Date
+  originalValue: string | number | Date | null | undefined
   normalizedDate: Date
   formatted: string // DD/MM/YYYY
   isValid: boolean
