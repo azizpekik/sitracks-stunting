@@ -208,7 +208,7 @@ function createRawWithFlagsSheet(validationResults: any[]) {
       }
 
       // Create flag details array
-      const flagDetails = result.keterangan.split(';').map(flag => flag.trim()).filter(Boolean)
+      const flagDetails = result.keterangan.split(';').map((flag: string) => flag.trim()).filter(Boolean)
 
       // Status icon
       const statusIcon = result.validasi_input === 'ERROR' ? '⛔' :
