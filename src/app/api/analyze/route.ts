@@ -128,8 +128,8 @@ async function parseExcelFile(file: File): Promise<any[]> {
     console.log(`Total measurements across all children: ${totalMeasurements}`)
 
     children.forEach((child, index) => {
-      const measurementsWithWeight = child.bulan_data.filter((m: any) => m.berat > 0).length
-      const measurementsWithHeight = child.bulan_data.filter((m: any) => m.tinggi > 0).length
+      const measurementsWithWeight = child.bulan_data.filter((m: any) => m.berat && m.berat > 0).length
+      const measurementsWithHeight = child.bulan_data.filter((m: any) => m.tinggi && m.tinggi > 0).length
       console.log(`${index + 1}. ${child.nama_anak}: ${child.bulan_data.length} measurements (${measurementsWithWeight} with weight, ${measurementsWithHeight} with height)`)
     })
 
@@ -185,7 +185,7 @@ function analyzeChildData(children: any[]) {
     console.log(`Sorted ${sortedMeasurements.length} measurements chronologically`)
 
     // Detect missing months in the expected range
-    const validMeasurements = sortedMeasurements.filter(m => m.weight_kg > 0 || m.height_cm > 0)
+    const validMeasurements = sortedMeasurements.filter(m => (m.weight_kg && m.weight_kg > 0) || (m.height_cm && m.height_cm > 0))
     const { missing_months, has_gaps } = detectMissingMonths(validMeasurements)
 
     if (has_gaps) {
@@ -219,14 +219,17 @@ function analyzeChildData(children: any[]) {
       // PRD 4.1 - Hierarki Validasi (Short-circuit evaluation)
 
       // 1. Missing Data Check (Priority: Missing)
-      if (measurement.weight_kg === 0 || measurement.height_cm === 0) {
+      const weight = measurement.weight_kg || 0
+      const height = measurement.height_cm || 0
+
+      if (weight === 0 || height === 0) {
         missing++
         result.status_berat = 'Missing'
         result.status_tinggi = 'Missing'
         result.validasi_input = 'WARNING' // Following PRD: Missing = WARNING level
-        result.keterangan = measurement.weight_kg === 0 && measurement.height_cm === 0
+        result.keterangan = weight === 0 && height === 0
           ? 'Data berat dan tinggi kosong'
-          : measurement.weight_kg === 0 ? 'Data berat kosong' : 'Data tinggi kosong'
+          : weight === 0 ? 'Data berat kosong' : 'Data tinggi kosong'
         validationResults.push(result)
         console.log(`Missing data detected: ${result.keterangan}`)
         return
@@ -238,15 +241,15 @@ function analyzeChildData(children: any[]) {
       // Create validation input for WHO standards
       const currentMeasurement = {
         age_months: measurement.age_months,
-        weight_kg: measurement.weight_kg,
-        height_cm: measurement.height_cm,
+        weight_kg: weight,
+        height_cm: height,
         date: measurement.date
       }
 
       const previousValidationData = previousMeasurement ? {
         age_months: previousMeasurement.age_months,
-        weight_kg: previousMeasurement.weight_kg,
-        height_cm: previousMeasurement.height_cm,
+        weight_kg: previousMeasurement.weight_kg || 0,
+        height_cm: previousMeasurement.height_cm || 0,
         date: previousMeasurement.date
       } : undefined
 
