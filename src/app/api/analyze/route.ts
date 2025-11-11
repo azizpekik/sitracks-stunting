@@ -373,7 +373,7 @@ export async function POST(request: NextRequest) {
     const jobData = {
       analyzer_name: analyzer_name,
       analyzer_institution: analyzer_institution,
-      status: 'completed',
+      status: 'completed' as const,
       completed_at: new Date().toISOString(),
       summary: {
         total_anak: analysis.total_anak,
