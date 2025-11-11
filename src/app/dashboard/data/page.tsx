@@ -14,20 +14,52 @@ import { useAuth } from '@/contexts/AuthContext'
 import { getContextContentWithFallback } from '@/lib/report-reader'
 import ChatBot from '@/components/ui/chatbot'
 
-interface Job {
+interface AnalysisResult {
   id: string
+  job_id: string
   analyzer_name: string
   analyzer_institution: string
-  status: 'processing' | 'completed' | 'failed'
   created_at: string
-  completed_at?: string
-  summary?: {
-    total_anak: number
+  total_anak: number
+  total_records: number
+  valid: number
+  warning: number
+  error: number
+  missing: number
+  children: ChildAnalysis[]
+  excel_file_url?: string
+  txt_file_url?: string
+}
+
+interface ChildAnalysis {
+  id: string
+  analysis_id: string
+  no: number
+  nik: string
+  nama_anak: string
+  tanggal_lahir: string
+  jenis_kelamin: string
+  total_data: number
+  valid_count: number
+  warning_count: number
+  error_count: number
+  missing_count: number
+  status: 'VALID' | 'WARNING' | 'ERROR'
+  monthly_data: any[]
+}
+
+interface ApiResponse {
+  results: AnalysisResult[]
+  pagination: {
+    limit: number
+    offset: number
+    total: number
+    hasMore: boolean
+  }
+  statistics: {
+    total_analyses: number
+    total_children: number
     total_records: number
-    valid: number
-    warning: number
-    error: number
-    missing: number
   }
 }
 
@@ -46,7 +78,7 @@ const statusIcons = {
 export default function DataAnalyzePage() {
   const { user, token } = useAuth()
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+  // const [statusFilter, setStatusFilter] = useState<string>('all') // Not needed for analyses
   const [deletingJobId, setDeletingJobId] = useState<string | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
 
@@ -55,45 +87,67 @@ export default function DataAnalyzePage() {
   const [isChatBotOpen, setIsChatBotOpen] = useState(false)
   const [chatBotSize, setChatBotSize] = useState<'normal' | 'wide'>('normal')
 
-  // Fetch jobs with authentication
-  const { data: jobs = [], isLoading, error } = useQuery<Job[]>({
-    queryKey: ['jobs'],
+  // Fetch analysis results with authentication
+  const { data: analysisData, isLoading, error, refetch } = useQuery<ApiResponse>({
+    queryKey: ['analyses'],
     queryFn: async () => {
       try {
         const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000')
-        const response = await apiClientWithAuth.getJobs(100, 0)
+        const response = await fetch(`${API_BASE_URL}/api/analyses?limit=100&offset=0`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
 
-        // Ensure response is an array
-        if (Array.isArray(response)) {
-          return response
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+
+        const data = await response.json()
+        console.log('Analysis API response:', data)
+
+        // Ensure we have the expected structure
+        if (data && data.results && Array.isArray(data.results)) {
+          return data
         } else {
-          console.error('API response is not an array:', response)
-          return []
+          console.error('API response does not have expected structure:', data)
+          return {
+            results: [],
+            pagination: { limit: 100, offset: 0, total: 0, hasMore: false },
+            statistics: { total_analyses: 0, total_children: 0, total_records: 0 }
+          }
         }
       } catch (error) {
-        console.error('Error fetching jobs:', error)
-        return [] // Return empty array on error to prevent filter issues
+        console.error('Error fetching analyses:', error)
+        return {
+          results: [],
+          pagination: { limit: 100, offset: 0, total: 0, hasMore: false },
+          statistics: { total_analyses: 0, total_children: 0, total_records: 0 }
+        }
       }
     },
     enabled: !!user && !!token,
+    refetchInterval: 10000, // Refresh every 10 seconds
   })
 
-  // Filter jobs based on search and status
-  const filteredJobs = jobs.filter(job => {
+  const analyses = analysisData?.results || []
+  const statistics = analysisData?.statistics || { total_analyses: 0, total_children: 0, total_records: 0 }
+
+  // Filter analyses based on search
+  const filteredAnalyses = analyses.filter(analysis => {
     const matchesSearch =
-      job.analyzer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.analyzer_institution.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.id.toLowerCase().includes(searchTerm.toLowerCase())
+      analysis.analyzer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      analysis.analyzer_institution.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      analysis.id.toLowerCase().includes(searchTerm.toLowerCase())
 
-    const matchesStatus = statusFilter === 'all' || job.status === statusFilter
-
-    return matchesSearch && matchesStatus
+    return matchesSearch
   })
 
-  const handleDownload = async (job: Job, filename: string) => {
+  const handleDownload = async (analysis: AnalysisResult, filename: string) => {
     try {
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000')
-      const downloadUrl = `${API_BASE_URL}/api/download/${filename}?job=${job.id}`
+      const downloadUrl = `${API_BASE_URL}/api/download/${filename}?job=${analysis.job_id}`
       await downloadFile(downloadUrl, filename)
     } catch (error) {
       console.error('Error downloading file:', error)
@@ -103,26 +157,38 @@ export default function DataAnalyzePage() {
 
   const queryClient = useQueryClient()
 
-  const handleDeleteJob = async (jobId: string) => {
+  const handleDeleteAnalysis = async (analysisId: string) => {
     try {
-      await apiClientWithAuth.deleteJob(jobId)
-      queryClient.invalidateQueries({ queryKey: ['jobs'] })
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000')
+      const response = await fetch(`${API_BASE_URL}/api/analyses?id=${analysisId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      await refetch()
       setShowDeleteModal(false)
       setDeletingJobId(null)
     } catch (error: any) {
-      console.error('Error deleting job:', error)
+      console.error('Error deleting analysis:', error)
       alert(error.message || 'Gagal menghapus data analisis')
     }
   }
 
-  const handleDeleteClick = (job: Job) => {
-    setDeletingJobId(job.id)
+  const handleDeleteClick = (analysis: AnalysisResult) => {
+    setDeletingJobId(analysis.id)
     setShowDeleteModal(true)
   }
 
   const confirmDelete = () => {
     if (deletingJobId) {
-      handleDeleteJob(deletingJobId)
+      handleDeleteAnalysis(deletingJobId)
     }
   }
 
@@ -238,73 +304,59 @@ ${job.status === 'completed'
               <CardTitle className="text-sm font-medium text-gray-600">Total Analisis</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{jobs.length}</div>
+              <div className="text-2xl font-bold text-blue-600">{statistics.total_analyses}</div>
+              <div className="text-xs text-gray-500 mt-1">Analisis yang telah diproses</div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Berhasil</CardTitle>
+              <CardTitle className="text-sm font-medium text-gray-600">Total Anak</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {jobs.filter(job => job.status === 'completed').length}
-              </div>
+              <div className="text-2xl font-bold text-green-600">{statistics.total_children}</div>
+              <div className="text-xs text-gray-500 mt-1">Anak dianalisis</div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Sedang Diproses</CardTitle>
+              <CardTitle className="text-sm font-medium text-gray-600">Total Records</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">
-                {jobs.filter(job => job.status === 'processing').length}
-              </div>
+              <div className="text-2xl font-bold text-purple-600">{statistics.total_records}</div>
+              <div className="text-xs text-gray-500 mt-1">Data pengukuran</div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Gagal</CardTitle>
+              <CardTitle className="text-sm font-medium text-gray-600">Data Valid</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-600">
-                {jobs.filter(job => job.status === 'failed').length}
+              <div className="text-2xl font-bold text-emerald-600">
+                {analyses.reduce((sum, a) => sum + a.valid, 0)}
               </div>
+              <div className="text-xs text-gray-500 mt-1">Data yang valid</div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Filters */}
+        {/* Search */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="text-lg">Filter dan Pencarian</CardTitle>
+            <CardTitle className="text-lg">Pencarian</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <Input
-                    placeholder="Cari berdasarkan nama, instansi, atau ID..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-              <div className="w-full md:w-48">
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="all">Semua Status</option>
-                  <option value="processing">Sedang Diproses</option>
-                  <option value="completed">Berhasil</option>
-                  <option value="failed">Gagal</option>
-                </select>
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Cari berdasarkan nama analyzer, instansi, atau ID analisis..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
               </div>
             </div>
           </CardContent>
@@ -315,7 +367,7 @@ ${job.status === 'completed'
           <CardHeader>
             <CardTitle>Daftar Analisis</CardTitle>
             <CardDescription>
-              Menampilkan {filteredJobs.length} dari {jobs.length} analisis
+              Menampilkan {filteredAnalyses.length} dari {analyses.length} analisis
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -329,7 +381,7 @@ ${job.status === 'completed'
                 <XCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
                 <p className="text-red-600">Gagal memuat data analisis</p>
               </div>
-            ) : filteredJobs.length === 0 ? (
+            ) : filteredAnalyses.length === 0 ? (
               <div className="text-center py-8">
                 <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-500">Tidak ada data analisis yang ditemukan</p>
@@ -342,98 +394,80 @@ ${job.status === 'completed'
                       <th className="text-left py-3 px-4 font-medium text-gray-700">ID</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-700">Analyzer</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-700">Instansi</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-700">Status</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-700">Tanggal Dibuat</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-700">Ringkasan</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700">Tanggal</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700">Anak</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700">Validasi</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-700">Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredJobs.map((job) => (
-                      <tr key={job.id} className="border-b hover:bg-gray-50">
+                    {filteredAnalyses.map((analysis) => (
+                      <tr key={analysis.id} className="border-b hover:bg-gray-50">
                         <td className="py-3 px-4">
                           <span className="text-sm font-mono text-gray-600">
-                            {job.id.substring(0, 8)}...
+                            {analysis.id.substring(0, 8)}...
                           </span>
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center space-x-2">
                             <User className="h-4 w-4 text-gray-400" />
-                            <span className="font-medium">{job.analyzer_name}</span>
+                            <span className="font-medium">{analysis.analyzer_name}</span>
                           </div>
                         </td>
                         <td className="py-3 px-4">
-                          <span className="text-gray-600">{job.analyzer_institution}</span>
-                        </td>
-                        <td className="py-3 px-4">
-                          {getStatusBadge(job.status)}
+                          <span className="text-gray-600">{analysis.analyzer_institution}</span>
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center space-x-2 text-gray-600">
                             <Calendar className="h-4 w-4" />
-                            <span className="text-sm">{formatDate(job.created_at)}</span>
+                            <span className="text-sm">{formatDate(analysis.created_at)}</span>
                           </div>
                         </td>
                         <td className="py-3 px-4">
-                          {job.summary && job.status === 'completed' ? (
-                            <div className="text-sm">
-                              <div className="flex space-x-4">
-                                <span className="text-green-600">{job.summary.valid} valid</span>
-                                <span className="text-yellow-600">{job.summary.warning} warning</span>
-                                <span className="text-red-600">{job.summary.error} error</span>
-                              </div>
-                              <div className="text-gray-500 text-xs mt-1">
-                                {job.summary.total_anak} anak, {job.summary.total_records} records
-                              </div>
+                          <div className="text-sm">
+                            <div className="font-medium text-blue-600">{analysis.total_anak} anak</div>
+                            <div className="text-gray-500 text-xs">
+                              {analysis.total_records} data pengukuran
                             </div>
-                          ) : (
-                            <span className="text-gray-400 text-sm">-</span>
-                          )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="text-sm">
+                            <div className="flex space-x-2">
+                              <span className="text-green-600">{analysis.valid} ✓</span>
+                              <span className="text-yellow-600">{analysis.warning} ⚠</span>
+                              <span className="text-red-600">{analysis.error} ✗</span>
+                              <span className="text-gray-600">{analysis.missing} -</span>
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {Math.round((analysis.valid / analysis.total_records) * 100)}% valid
+                            </div>
+                          </div>
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex space-x-2">
-                            {job.status === 'completed' && (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleDownload(job, 'hasil_validasi.xlsx')}
-                                  className="text-green-600 hover:text-green-700"
-                                >
-                                  <Download className="h-4 w-4 mr-1" />
-                                  Excel
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleDownload(job, 'laporan_validasi.txt')}
-                                  className="text-blue-600 hover:text-blue-700"
-                                >
-                                  <Eye className="h-4 w-4 mr-1" />
-                                  Laporan
-                                </Button>
-                              </>
-                            )}
-                            {job.status === 'processing' && (
-                              <span className="text-sm text-gray-500">Memproses...</span>
-                            )}
-                            {job.status === 'failed' && (
-                              <span className="text-sm text-red-500">Gagal</span>
-                            )}
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleChatBotOpen(job)}
-                              className="text-purple-600 hover:text-purple-700"
-                              title="AI Assistant - Analisis Data"
+                              onClick={() => handleDownload(analysis, 'hasil_validasi.xlsx')}
+                              className="text-green-600 hover:text-green-700"
                             >
-                              <MessageCircle className="h-4 w-4 mr-1" />
-                              AI
+                              <Download className="h-4 w-4 mr-1" />
+                              Excel
                             </Button>
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleDeleteClick(job)}
+                              onClick={() => handleDownload(analysis, 'laporan_validasi.txt')}
+                              className="text-blue-600 hover:text-blue-700"
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              Laporan
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDeleteClick(analysis)}
                               className="text-red-600 hover:text-red-700"
                               title="Hapus data analisis"
                             >

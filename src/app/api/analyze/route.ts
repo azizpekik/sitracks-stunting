@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { addJob } from '@/lib/mock-data-store'
+import { createAnalysisResult, createChildAnalysis, createMonthlyData } from '@/lib/database'
 import * as XLSX from 'xlsx'
 
 // Excel parsing functions
@@ -59,7 +60,7 @@ async function parseExcelFile(file: File): Promise<ChildData[]> {
         nik: row[1] || '',
         nama_anak: row[2] || '',
         tanggal_lahir: row[3] || '',
-        jenis_kelamin: row[4] || 'L', // Default L if not specified
+        jenis_kelamin: row[4]?.toString().toUpperCase() || 'L', // Support both L/P and l/p
         bulan_data: []
       }
 
@@ -285,6 +286,88 @@ export async function POST(request: NextRequest) {
     console.log(`Analyzing data for ${children.length} children...`)
     const analysis = analyzeChildData(children)
 
+    // Store in database
+    console.log('Storing analysis results in database...')
+    const analysisResult = createAnalysisResult({
+      job_id: '', // Will be set after job creation
+      analyzer_name: analyzer_name,
+      analyzer_institution: analyzer_institution,
+      total_anak: analysis.total_anak,
+      total_records: analysis.total_records,
+      valid: analysis.valid,
+      warning: analysis.warning,
+      error: analysis.error,
+      missing: analysis.missing
+    })
+
+    // Group validation results by child and create child analyses
+    const childGroups: { [key: string]: any[] } = {}
+    analysis.validation_results.forEach(result => {
+      const key = `${result.nama_anak}|${result.nik}|${result.tanggal_lahir}`
+      if (!childGroups[key]) {
+        childGroups[key] = []
+      }
+      childGroups[key].push(result)
+    })
+
+    // Create child analysis records
+    Object.entries(childGroups).forEach(([key, results]) => {
+      const [nama_anak, nik, tanggal_lahir] = key.split('|')
+
+      // Find original child data to get jenis_kelamin
+      const originalChild = children.find(c =>
+        c.nama_anak === nama_anak && c.nik === nik && c.tanggal_lahir === tanggal_lahir
+      )
+
+      // Determine child status
+      let hasError = false
+      let hasWarning = false
+      let hasMissing = false
+
+      results.forEach(result => {
+        if (result.validasi_input === 'ERROR') hasError = true
+        if (result.validasi_input === 'WARNING') hasWarning = true
+        if (result.status_berat === 'Missing' || result.status_tinggi === 'Missing') hasMissing = true
+      })
+
+      let status: 'VALID' | 'WARNING' | 'ERROR' = 'VALID'
+      if (hasError) status = 'ERROR'
+      else if (hasWarning || hasMissing) status = 'WARNING'
+
+      // Create child analysis
+      const childAnalysis = createChildAnalysis({
+        analysis_id: analysisResult.id,
+        no: results[0].no,
+        nik: nik,
+        nama_anak: nama_anak,
+        tanggal_lahir: tanggal_lahir,
+        jenis_kelamin: originalChild?.jenis_kelamin || 'L', // Use actual gender from Excel
+        total_data: results.length,
+        valid_count: results.filter(r => r.validasi_input === 'OK').length,
+        warning_count: results.filter(r => r.validasi_input === 'WARNING').length,
+        error_count: results.filter(r => r.validasi_input === 'ERROR').length,
+        missing_count: results.filter(r => r.status_berat === 'Missing' || r.status_tinggi === 'Missing').length,
+        status: status
+      })
+
+      // Create monthly data records
+      results.forEach(result => {
+        createMonthlyData({
+          child_id: childAnalysis.id,
+          bulan: result.bulan,
+          tanggal_ukur: result.tanggal_ukur,
+          umur: result.umur,
+          berat: result.berat,
+          tinggi: result.tinggi,
+          cara_ukur: result.cara_ukur,
+          status_berat: result.status_berat,
+          status_tinggi: result.status_tinggi,
+          validasi_input: result.validasi_input,
+          keterangan: result.keterangan
+        })
+      })
+    })
+
     // Store validation results in job data for download
     const jobData = {
       analyzer_name: analyzer_name,
@@ -299,19 +382,32 @@ export async function POST(request: NextRequest) {
         error: analysis.error,
         missing: analysis.missing
       },
-      validation_results: analysis.validation_results
+      validation_results: analysis.validation_results,
+      analysis_id: analysisResult.id // Link to database
     }
+
+    // Update analysis result with job_id
+    analysisResult.job_id = 'temp-job-id'
 
     // Generate job with actual analysis data
     const newJob = addJob(jobData)
 
-    console.log('New analysis job created:', newJob)
+    // Update analysis result with actual job_id
+    analysisResult.job_id = newJob.id
 
-    // Return response with job ID
+    console.log('Analysis completed and stored:', {
+      analysis_id: analysisResult.id,
+      job_id: newJob.id,
+      total_children: analysis.total_anak,
+      total_records: analysis.total_records
+    })
+
+    // Return response with job ID and analysis ID
     const response = {
       job_id: newJob.id,
+      analysis_id: analysisResult.id,
       status: newJob.status,
-      message: 'Analisis selesai. Data telah diproses. (Real data from Excel)',
+      message: `Analisis selesai. ${analysis.total_anak} anak berhasil diproses.`,
       summary: newJob.summary
     }
 
