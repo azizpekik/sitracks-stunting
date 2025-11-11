@@ -88,7 +88,7 @@ function generateExcelValidationResults(jobId: string): ArrayBuffer {
   ]
 
   // Add validation results
-  job.validation_results.forEach((result: any) => {
+  job.validation_results.forEach((result: any, index: number) => {
     const row = [
       result.no,
       result.nik,
@@ -110,6 +110,88 @@ function generateExcelValidationResults(jobId: string): ArrayBuffer {
 
   // Create workbook with multiple sheets
   const ws = XLSX.utils.aoa_to_sheet(data)
+
+  // Add styling to cells based on validation results
+  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
+
+  // Style header row
+  for (let col = 0; col <= 13; col++) {
+    const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col })
+    if (!ws[cellAddress]) ws[cellAddress] = {}
+    ws[cellAddress].s = {
+      font: { bold: true, color: { rgb: 'FFFFFF' } },
+      fill: { fgColor: { rgb: '4472C4' } },
+      alignment: { horizontal: 'center' }
+    }
+  }
+
+  // Style validation results rows based on PRD color coding
+  job.validation_results.forEach((result: any, index: number) => {
+    const rowNum = index + 1 // +1 because header is row 0
+
+    // Determine cell style based on validasi_input
+    let fillColor = 'FFFFFF' // Default white
+    let fontColor = '000000' // Default black
+
+    switch (result.validasi_input) {
+      case 'ERROR':
+        // Merah - Tinggi menurun
+        fillColor = 'FF0000'
+        fontColor = 'FFFFFF'
+        break
+      case 'WARNING':
+        // Kuning/Oranye - Missing data, Missing month, Anomali berat, Tidak ideal
+        if (result.keterangan.includes('Tidak diukur') || result.keterangan.includes('kosong')) {
+          fillColor = 'FFFF00' // Kuning - Missing data
+        } else if (result.keterangan.includes('Gap data')) {
+          fillColor = 'FFD700' // Oranye tua - Gap data
+        } else {
+          fillColor = 'FFA500' // Oranye - Anomali berat / Tidak ideal
+        }
+        fontColor = '000000'
+        break
+      case 'OK':
+        // Hijau - Semua valid
+        fillColor = '00FF00'
+        fontColor = '000000'
+        break
+    }
+
+    // Apply style to all cells in this row
+    for (let col = 0; col <= 13; col++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: rowNum, c: col })
+      if (ws[cellAddress]) {
+        if (!ws[cellAddress].s) ws[cellAddress].s = {}
+        ws[cellAddress].s.fill = { fgColor: { rgb: fillColor } }
+        ws[cellAddress].s.font = { color: { rgb: fontColor } }
+
+        // Bold the validation input column
+        if (col === 12) { // Validasi Input column (column M)
+          ws[cellAddress].s.font.bold = true
+        }
+      }
+    }
+  })
+
+  // Set column widths
+  const colWidths = [
+    { wch: 5 },  // No
+    { wch: 15 }, // NIK
+    { wch: 25 }, // Nama Anak
+    { wch: 12 }, // Tanggal Lahir
+    { wch: 10 }, // Bulan
+    { wch: 12 }, // Tanggal Ukur
+    { wch: 8 },  // Umur
+    { wch: 10 }, // Berat
+    { wch: 10 }, // Tinggi
+    { wch: 10 }, // Cara Ukur
+    { wch: 12 }, // Status Berat
+    { wch: 12 }, // Status Tinggi
+    { wch: 12 }, // Validasi Input
+    { wch: 40 }  // Keterangan
+  ]
+  ws['!cols'] = colWidths
+
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, "Hasil Validasi")
 
@@ -132,12 +214,47 @@ function generateExcelValidationResults(jobId: string): ArrayBuffer {
   ]
 
   const wsSummary = XLSX.utils.aoa_to_sheet(summaryData)
+
+  // Style summary sheet
+  const summaryRange = XLSX.utils.decode_range(wsSummary['!ref'] || 'A1')
+
+  // Style title
+  const titleCell = XLSX.utils.encode_cell({ r: 0, c: 0 })
+  if (!wsSummary[titleCell]) wsSummary[titleCell] = {}
+  wsSummary[titleCell].s = {
+    font: { bold: true, sz: 16, color: { rgb: 'FFFFFF' } },
+    fill: { fgColor: { rgb: '4472C4' } },
+    alignment: { horizontal: 'center' }
+  }
+
+  // Style labels
+  for (let row = 2; row <= 7; row++) {
+    const labelCell = XLSX.utils.encode_cell({ r: row, c: 0 })
+    if (!wsSummary[labelCell]) wsSummary[labelCell] = {}
+    wsSummary[labelCell].s = {
+      font: { bold: true },
+      fill: { fgColor: { rgb: 'E2EFDA' } }
+    }
+  }
+
+  // Style info labels
+  for (let row = 9; row <= 13; row++) {
+    const labelCell = XLSX.utils.encode_cell({ r: row, c: 0 })
+    if (!wsSummary[labelCell]) wsSummary[labelCell] = {}
+    wsSummary[labelCell].s = {
+      font: { bold: true },
+      fill: { fgColor: { rgb: 'FCE4D6' } }
+    }
+  }
+
+  wsSummary['!cols'] = [{ wch: 20 }, { wch: 15 }]
+
   XLSX.utils.book_append_sheet(wb, wsSummary, "Ringkasan")
 
   // Generate Excel file
   const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
 
-  console.log(`Generated Excel validation results for job ${jobId}: ${data.length - 1} rows`)
+  console.log(`Generated Excel validation results for job ${jobId}: ${data.length - 1} rows with color coding`)
   return excelBuffer
 }
 
