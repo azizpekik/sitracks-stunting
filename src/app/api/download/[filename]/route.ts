@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
+import { getJobs } from '@/lib/mock-data-store'
 
 export async function GET(
   request: NextRequest,
@@ -66,9 +67,8 @@ export async function GET(
 
 function generateExcelValidationResults(jobId: string): ArrayBuffer {
   // Get the job with validation results
-  const { getJobs } = require('@/lib/mock-data-store')
   const jobs = getJobs()
-  const job = jobs.find(j => j.id === jobId)
+  const job = jobs.find((j: any) => j.id === jobId)
 
   if (!job || !job.validation_results) {
     // Fallback to empty template if no validation results
@@ -88,7 +88,7 @@ function generateExcelValidationResults(jobId: string): ArrayBuffer {
   ]
 
   // Add validation results
-  job.validation_results.forEach(result => {
+  job.validation_results.forEach((result: any) => {
     const row = [
       result.no,
       result.nik,
@@ -143,9 +143,8 @@ function generateExcelValidationResults(jobId: string): ArrayBuffer {
 
 function generateTextReport(jobId: string): string {
   // Get the job with validation results
-  const { getJobs } = require('@/lib/mock-data-store')
   const jobs = getJobs()
-  const job = jobs.find(j => j.id === jobId)
+  const job = jobs.find((j: any) => j.id === jobId)
 
   if (!job || !job.validation_results) {
     // Fallback to empty template if no validation results
