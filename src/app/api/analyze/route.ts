@@ -347,7 +347,8 @@ export async function POST(request: NextRequest) {
         warning_count: results.filter(r => r.validasi_input === 'WARNING').length,
         error_count: results.filter(r => r.validasi_input === 'ERROR').length,
         missing_count: results.filter(r => r.status_berat === 'Missing' || r.status_tinggi === 'Missing').length,
-        status: status
+        status: status,
+        monthly_data: [] // Initialize empty array, will be populated later
       })
 
       // Create monthly data records
