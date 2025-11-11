@@ -205,7 +205,8 @@ export function initializeSampleData() {
       warning_count: 2,
       error_count: 0,
       missing_count: 0,
-      status: i % 5 === 0 ? 'WARNING' : 'VALID'
+      status: i % 5 === 0 ? 'WARNING' : 'VALID',
+      monthly_data: []
     })
 
     // Add sample monthly data
