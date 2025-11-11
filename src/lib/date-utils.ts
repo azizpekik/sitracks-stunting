@@ -431,7 +431,7 @@ export function normalizeChildData(
       // Only create measurement if there's meaningful data
       if (umur > 0 || berat > 0 || tinggi > 0 || tanggal_ukur.isValid) {
         const measurement = createMeasurementRecord(
-          tanggal_ukur.isValid ? tanggal_ukur : month, // Use month as fallback
+          tanggal_ukur.isValid ? tanggal_ukur.originalValue : month, // Use original value or month as fallback
           child.tanggal_lahir.normalizedDate
         )
 
