@@ -212,7 +212,7 @@ export default function DataAnalyzePage() {
     )
   }
 
-  const handleChatBotOpen = async (job: Job) => {
+  const handleChatBotOpen = async (analysis: AnalysisResult) => {
     try {
       // Ensure we're in browser environment
       if (typeof window === 'undefined') {
@@ -220,11 +220,11 @@ export default function DataAnalyzePage() {
         return
       }
 
-      const jobName = `${job.analyzer_name} - ${job.analyzer_institution}`
-      const reportContent = await getContextContentWithFallback(job.id)
+      const jobName = `${analysis.analyzer_name} - ${analysis.analyzer_institution}`
+      const reportContent = await getContextContentWithFallback(analysis.job_id)
 
       setChatBotJob({
-        id: job.id,
+        id: analysis.id,
         name: jobName,
         content: reportContent
       })
@@ -234,37 +234,31 @@ export default function DataAnalyzePage() {
 
       // Show error message with fallback
       setChatBotJob({
-        id: job.id,
-        name: `${job.analyzer_name} - ${job.analyzer_institution}`,
+        id: analysis.id,
+        name: `${analysis.analyzer_name} - ${analysis.analyzer_institution}`,
         content: `
 LAPORAN ANALISIS PERTUMBUHAN ANAK
 ================================
 
-Status: ${job.status}
+Status: completed
 
 Informasi Job:
-- ID: ${job.id}
-- Analyzer: ${job.analyzer_name}
-- Institution: ${job.analyzer_institution}
-- Status: ${job.status}
-- Created: ${formatDate(job.created_at)}
+- ID: ${analysis.id}
+- Analyzer: ${analysis.analyzer_name}
+- Institution: ${analysis.analyzer_institution}
+- Status: completed
+- Created: ${formatDate(analysis.created_at)}
 
-${job.summary ? `
 Ringkasan:
-- Total Anak: ${job.summary.total_anak}
-- Total Records: ${job.summary.total_records}
-- Valid: ${job.summary.valid}
-- Warning: ${job.summary.warning}
-- Error: ${job.summary.error}
-- Missing: ${job.summary.missing}
-` : ''}
+- Total Anak: ${analysis.total_anak}
+- Total Records: ${analysis.total_records}
+- Valid: ${analysis.valid}
+- Warning: ${analysis.warning}
+- Error: ${analysis.error}
+- Missing: ${analysis.missing}
 
 Catatan:
-${job.status === 'completed'
-  ? 'Analisis telah selesai. Anda dapat menanyakan hasil analisis kepada asisten AI.'
-  : job.status === 'processing'
-  ? 'Analisis sedang diproses. Chatbot akan tersedia setelah analisis selesai.'
-  : 'Analisis gagal. Silakan periksa data input dan coba lagi.'}
+Analisis telah selesai. Anda dapat menanyakan hasil analisis kepada asisten AI.
         `
       })
       setIsChatBotOpen(true)
