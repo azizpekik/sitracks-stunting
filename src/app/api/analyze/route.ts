@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { addJob } from '@/lib/mock-data-store'
 import { createAnalysisResult, createChildAnalysis, createMonthlyData } from '@/lib/database'
+import { calculateZScores, validateMeasurement, VALIDATION_THRESHOLDS, ValidationStatus } from '@/lib/who-standards'
+import { normalizeChildData, sortMeasurementsChronologically, detectMissingMonths, getMonthName, formatAge } from '@/lib/date-utils'
 import * as XLSX from 'xlsx'
 
 // Excel parsing functions
@@ -55,7 +57,7 @@ function convertExcelDate(excelDate: any): string {
   return ''
 }
 
-async function parseExcelFile(file: File): Promise<ChildData[]> {
+async function parseExcelFile(file: File): Promise<any[]> {
   try {
     const buffer = await file.arrayBuffer()
     const workbook = XLSX.read(buffer, { type: 'buffer' })
@@ -63,84 +65,72 @@ async function parseExcelFile(file: File): Promise<ChildData[]> {
     const worksheet = workbook.Sheets[sheetName]
     const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
 
-    console.log('=== Excel Parsing Debug ===')
+    console.log('=== Excel Parsing Debug (PRD Compliant) ===')
     console.log('Total rows:', data.length)
     console.log('Headers:', data[0])
 
     // Skip header row and parse data
-    const children: ChildData[] = []
+    const children: any[] = []
     const headers = data[0] as string[]
 
     for (let i = 1; i < data.length; i++) {
       const row = data[i] as any[]
       if (!row[0] || !row[1] || !row[2]) {
-        console.log(`Skipping row ${i}: empty data`, row.slice(0, 5))
+        console.log(`Skipping row ${i}: empty basic data`, row.slice(0, 5))
         continue
       }
 
-      console.log(`Processing row ${i}:`, row.slice(0, 8))
+      console.log(`\nProcessing row ${i}:`, row.slice(0, 10))
 
-      const child: ChildData = {
-        no: parseInt(row[0]) || i,
-        nik: row[1] ? row[1].toString() : '',
-        nama_anak: row[2] ? row[2].toString() : '',
-        tanggal_lahir: convertExcelDate(row[3]),
-        jenis_kelamin: row[4] ? row[4].toString().toUpperCase() : 'L',
-        bulan_data: []
+      // Use the comprehensive normalization system
+      const normalizedChild = normalizeChildData(row, headers)
+
+      if (!normalizedChild.is_valid) {
+        console.log(`Skipping row ${i}: validation failed`, normalizedChild.validation_errors)
+        continue
       }
 
-      console.log(`Child ${i}: ${child.nama_anak}, NIK: ${child.nik}, Tgl Lahir: ${child.tanggal_lahir}`)
+      console.log(`Normalized child ${i}: ${normalizedChild.nama_anak}`)
+      console.log(`- NIK: ${normalizedChild.nik}`)
+      console.log(`- Tgl Lahir: ${normalizedChild.tanggal_lahir.formatted} (${normalizedChild.tanggal_lahir.parseMethod})`)
+      console.log(`- Gender: ${normalizedChild.jenis_kelamin}`)
+      console.log(`- Measurements: ${normalizedChild.measurements.length}`)
 
-      // Parse monthly data - improved logic for wide format
-      const months = ['JANUARI', 'FEBRUARI', 'MARET', 'APRIL', 'MEI', 'JUNI',
-                     'JULI', 'AGUSTUS', 'SEPTEMBER', 'OKTOBER', 'NOVEMBER', 'DESEMBER']
-
-      // Create a map of month name to column index
-      const monthColumns: { [key: string]: number } = {}
-
-      for (let col = 0; col < headers.length; col++) {
-        const header = headers[col]?.toString().toUpperCase() || ''
-        const month = months.find(m => header.includes(m))
-        if (month) {
-          monthColumns[month] = col
-          console.log(`Found ${month} at column ${col}`)
-        }
+      // Convert normalized measurements back to the expected format
+      const child: any = {
+        no: normalizedChild.no,
+        nik: normalizedChild.nik,
+        nama_anak: normalizedChild.nama_anak,
+        tanggal_lahir: normalizedChild.tanggal_lahir.formatted,
+        jenis_kelamin: normalizedChild.jenis_kelamin,
+        bulan_data: normalizedChild.measurements.map((measurement: any) => ({
+          bulan: measurement.bulan || getMonthName(measurement.age_months),
+          tanggal_ukur: measurement.formatted_date,
+          umur: measurement.age_months,
+          berat: measurement.berat || 0,
+          tinggi: measurement.tinggi || 0,
+          cara_ukur: measurement.cara_ukur || ''
+        }))
       }
 
-      // Parse data for each month
-      for (const month of months) {
-        if (monthColumns[month] !== undefined) {
-          const baseCol = monthColumns[month]
+      console.log(`Final child data for ${child.nama_anak}: ${child.bulan_data.length} monthly records`)
 
-          const monthlyData: MonthlyData = {
-            bulan: month,
-            tanggal_ukur: convertExcelDate(row[baseCol + 1]) || '',
-            umur: parseInt(row[baseCol + 2]) || 0,
-            berat: parseFloat(row[baseCol + 3]) || 0,
-            tinggi: parseFloat(row[baseCol + 4]) || 0,
-            cara_ukur: row[baseCol + 5] ? row[baseCol + 5].toString() : ''
-          }
-
-          console.log(`${month}: umur=${monthlyData.umur}, berat=${monthlyData.berat}, tinggi=${monthlyData.tinggi}`)
-
-          // Add if there's meaningful data (age > 0 OR weight/height > 0)
-          if (monthlyData.umur > 0 || monthlyData.berat > 0 || monthlyData.tinggi > 0) {
-            child.bulan_data.push(monthlyData)
-          }
-        }
-      }
-
-      console.log(`Total monthly data for ${child.nama_anak}: ${child.bulan_data.length}`)
-
-      if (child.nama_anak) {
+      if (child.nama_anak && child.bulan_data.length > 0) {
         children.push(child)
       }
     }
 
-    console.log(`=== Parsing Complete ===`)
-    console.log(`Parsed ${children.length} children from Excel file`)
-    children.forEach(child => {
-      console.log(`- ${child.nama_anak}: ${child.bulan_data.length} measurements`)
+    console.log(`\n=== Parsing Complete ===`)
+    console.log(`Successfully parsed ${children.length} children from Excel file`)
+
+    // Summary statistics
+    const totalMeasurements = children.reduce((sum, child) => sum + child.bulan_data.length, 0)
+    console.log(`Total measurements across all children: ${totalMeasurements}`)
+
+    children.forEach((child, index) => {
+      const measurementsWithWeight = child.bulan_data.filter((m: any) => m.berat > 0).length
+      const measurementsWithHeight = child.bulan_data.filter((m: any) => m.tinggi > 0).length
+      console.log(`${index + 1}. ${child.nama_anak}: ${child.bulan_data.length} measurements (${measurementsWithWeight} with weight, ${measurementsWithHeight} with height)`)
     })
 
     return children
@@ -150,7 +140,7 @@ async function parseExcelFile(file: File): Promise<ChildData[]> {
   }
 }
 
-function analyzeChildData(children: ChildData[]) {
+function analyzeChildData(children: any[]) {
   let totalRecords = 0
   let valid = 0
   let warning = 0
@@ -160,16 +150,40 @@ function analyzeChildData(children: ChildData[]) {
   const validationResults: ValidationResult[] = []
   let currentNo = 1
 
-  console.log('=== Starting Analysis ===')
+  console.log('=== Starting Complete Analysis (PRD Compliant) ===')
 
   children.forEach(child => {
-    console.log(`Analyzing child: ${child.nama_anak}, ${child.bulan_data.length} measurements`)
+    console.log(`\nAnalyzing child: ${child.nama_anak}, ${child.bulan_data.length} measurements`)
 
-    // Sort monthly data by age for proper analysis
-    const sortedData = [...child.bulan_data].sort((a, b) => a.umur - b.umur)
+    // Normalize child data first
+    const normalizedChild = {
+      ...child,
+      measurements: child.bulan_data.map((data: any) => ({
+        age_months: data.umur,
+        weight_kg: data.berat,
+        height_cm: data.tinggi,
+        date: data.tanggal_ukur ? new Date(data.tanggal_ukur) : new Date(),
+        month: data.bulan
+      }))
+    }
 
-    sortedData.forEach((data, index) => {
+    // Sort measurements by age for proper analysis
+    const sortedMeasurements = sortMeasurementsChronologically(normalizedChild.measurements)
+    console.log(`Sorted ${sortedMeasurements.length} measurements chronologically`)
+
+    // Detect missing months in the expected range
+    const validMeasurements = sortedMeasurements.filter(m => m.weight_kg > 0 || m.height_cm > 0)
+    const { missing_months, has_gaps } = detectMissingMonths(validMeasurements)
+
+    if (has_gaps) {
+      console.log(`Missing months detected: ${missing_months.join(', ')}`)
+    }
+
+    // Process each measurement with full PRD validation
+    sortedMeasurements.forEach((measurement, index) => {
       totalRecords++
+
+      console.log(`\nProcessing ${measurement.month || 'Unknown'}: age=${measurement.age_months}, weight=${measurement.weight_kg}kg, height=${measurement.height_cm}cm`)
 
       // Initialize validation result with default values
       const result: ValidationResult = {
@@ -177,69 +191,163 @@ function analyzeChildData(children: ChildData[]) {
         nik: child.nik,
         nama_anak: child.nama_anak,
         tanggal_lahir: child.tanggal_lahir,
-        bulan: data.bulan,
-        tanggal_ukur: data.tanggal_ukur,
-        umur: data.umur,
-        berat: data.berat,
-        tinggi: data.tinggi,
-        cara_ukur: data.cara_ukur,
+        bulan: measurement.month || 'Unknown',
+        tanggal_ukur: measurement.date ? measurement.date.toLocaleDateString('id-ID') : '',
+        umur: measurement.age_months,
+        berat: measurement.weight_kg || 0,
+        tinggi: measurement.height_cm || 0,
+        cara_ukur: (measurement as any).cara_ukur || '',
         status_berat: 'Ideal',
         status_tinggi: 'Ideal',
         validasi_input: 'OK',
         keterangan: ''
       }
 
-      console.log(`Processing ${data.bulan}: age=${data.umur}, weight=${data.berat}, height=${data.tinggi}`)
+      // PRD 4.1 - Hierarki Validasi (Short-circuit evaluation)
 
-      // PRD 4.1 - Hierarki Validasi
-      // 1. Missing Data Check
-      if (data.berat === 0 || data.tinggi === 0) {
+      // 1. Missing Data Check (Priority: Missing)
+      if (measurement.weight_kg === 0 || measurement.height_cm === 0) {
         missing++
         result.status_berat = 'Missing'
         result.status_tinggi = 'Missing'
-        result.validasi_input = 'WARNING' // Kuning - Missing data
-        result.keterangan = data.berat === 0 && data.tinggi === 0
+        result.validasi_input = 'WARNING' // Following PRD: Missing = WARNING level
+        result.keterangan = measurement.weight_kg === 0 && measurement.height_cm === 0
           ? 'Data berat dan tinggi kosong'
-          : data.berat === 0 ? 'Data berat kosong' : 'Data tinggi kosong'
+          : measurement.weight_kg === 0 ? 'Data berat kosong' : 'Data tinggi kosong'
         validationResults.push(result)
         console.log(`Missing data detected: ${result.keterangan}`)
         return
       }
 
-      // 2. Konsistensi Tinggi Badan (Priority 1 - ERROR)
-      if (index > 0 && data.tinggi < sortedData[index - 1].tinggi) {
-        error++
-        result.status_tinggi = 'Tidak Ideal'
-        result.validasi_input = 'ERROR' // Merah - Tinggi menurun
-        result.keterangan = `Tinggi menurun (indikasi salah input): ${sortedData[index - 1].tinggi}cm → ${data.tinggi}cm`
-        validationResults.push(result)
-        console.log(`Height decrease detected: ${result.keterangan}`)
-        return
+      // Get previous measurement for comparison
+      const previousMeasurement = index > 0 ? sortedMeasurements[index - 1] : null
+
+      // Create validation input for WHO standards
+      const currentMeasurement = {
+        age_months: measurement.age_months,
+        weight_kg: measurement.weight_kg,
+        height_cm: measurement.height_cm,
+        date: measurement.date
       }
 
-      // 3. Gap umur antar baris anak > 1 bulan (Missing month)
-      if (index > 0) {
-        const prevMonth = sortedData[index - 1]
-        const currentMonthAge = data.umur
-        const prevMonthAge = prevMonth.umur
-        const ageGap = currentMonthAge - prevMonthAge
+      const previousValidationData = previousMeasurement ? {
+        age_months: previousMeasurement.age_months,
+        weight_kg: previousMeasurement.weight_kg,
+        height_cm: previousMeasurement.height_cm,
+        date: previousMeasurement.date
+      } : undefined
 
-        if (ageGap > 1) {
+      // Perform comprehensive validation
+      const validationResult = validateMeasurement(
+        currentMeasurement,
+        previousValidationData,
+        child.jenis_kelamin
+      )
+
+      console.log(`Validation result: ${validationResult.status}, flags: [${validationResult.flags.join(', ')}]`)
+
+      // Apply validation results
+      if (validationResult.flags.length > 0) {
+        result.keterangan = validationResult.flags.join('; ')
+      }
+
+      // Set status based on validation result with priority system
+      // Priority: ERROR > WARNING > OK
+      switch (validationResult.status) {
+        case 'ERROR':
+          error++
+          result.validasi_input = 'ERROR'
+          result.status_berat = 'Tidak Ideal'
+          result.status_tinggi = 'Tidak Ideal'
+          console.log(`ERROR detected: ${result.keterangan}`)
+          break
+
+        case 'WARNING':
           warning++
-          result.validasi_input = 'WARNING' // Kuning - Missing month
-          result.keterangan = `Gap data: tidak ada pengukuran untuk ${ageGap - 1} bulan sebelum ${data.bulan}`
-          // Add missing month records
-          for (let gapAge = prevMonthAge + 1; gapAge < currentMonthAge; gapAge++) {
+          result.validasi_input = 'WARNING'
+          // Set specific status based on flags
+          if (result.keterangan.includes('tidak ideal')) {
+            result.status_berat = result.keterangan.includes('berat') ? 'Tidak Ideal' : 'Ideal'
+            result.status_tinggi = result.keterangan.includes('tinggi') ? 'Tidak Ideal' : 'Ideal'
+          }
+          console.log(`WARNING detected: ${result.keterangan}`)
+          break
+
+        case 'OK':
+          valid++
+          result.validasi_input = 'OK'
+          // Use Z-score results to determine status if available
+          if (validationResult.z_scores) {
+            const { z_wfa, z_hfa, wfa_status, hfa_status } = validationResult.z_scores
+
+            result.status_berat = wfa_status.includes('UNDER') || wfa_status.includes('SEVERE') ? 'Tidak Ideal' : 'Ideal'
+            result.status_tinggi = hfa_status.includes('STUNTED') ? 'Tidak Ideal' : 'Ideal'
+
+            // Add Z-score info to remarks if significant
+            if (Math.abs(z_wfa) > 2 || Math.abs(z_hfa) > 2) {
+              const zInfo = []
+              if (Math.abs(z_wfa) > 2) zInfo.push(`WFA=${z_wfa}`)
+              if (Math.abs(z_hfa) > 2) zInfo.push(`HFA=${z_hfa}`)
+              if (result.keterangan) {
+                result.keterangan += ` (Z-score: ${zInfo.join(', ')})`
+              } else {
+                result.keterangan = `Z-score: ${zInfo.join(', ')}`
+              }
+            }
+          }
+          console.log(`Valid measurement recorded`)
+          break
+      }
+
+      validationResults.push(result)
+    })
+
+    // Add missing months that were detected but not recorded
+    if (has_gaps) {
+      console.log(`Adding ${missing_months.length} missing month records`)
+      missing_months.forEach(missingAge => {
+        totalRecords++
+        missing++
+
+        const missingResult: ValidationResult = {
+          no: currentNo++,
+          nik: child.nik,
+          nama_anak: child.nama_anak,
+          tanggal_lahir: child.tanggal_lahir,
+          bulan: getMonthName(missingAge),
+          tanggal_ukur: '',
+          umur: missingAge,
+          berat: 0,
+          tinggi: 0,
+          cara_ukur: '',
+          status_berat: 'Missing',
+          status_tinggi: 'Missing',
+          validasi_input: 'WARNING',
+          keterangan: 'Tidak diukur'
+        }
+        validationResults.push(missingResult)
+      })
+    }
+
+    // Add missing months before first measurement if age > 1
+    if (sortedMeasurements.length > 0) {
+      const firstAge = sortedMeasurements[0].age_months
+      if (firstAge > 1) {
+        console.log(`Adding missing months before first measurement for ${child.nama_anak}: ages 1 to ${firstAge - 1}`)
+        for (let age = 1; age < firstAge; age++) {
+          // Skip if this age was already handled by gap detection
+          if (!missing_months.includes(age)) {
             totalRecords++
             missing++
+
             const missingResult: ValidationResult = {
               no: currentNo++,
               nik: child.nik,
               nama_anak: child.nama_anak,
               tanggal_lahir: child.tanggal_lahir,
-              bulan: 'Missing',
+              bulan: getMonthName(age),
               tanggal_ukur: '',
-              umur: gapAge,
+              umur: age,
               berat: 0,
               tinggi: 0,
               cara_ukur: '',
@@ -250,84 +358,18 @@ function analyzeChildData(children: ChildData[]) {
             }
             validationResults.push(missingResult)
           }
-          validationResults.push(result)
-          console.log(`Age gap detected: ${result.keterangan}`)
-          return
-        }
-      }
-
-      // 4. Anomali Berat (>10% decrease) (Priority 2 - WARNING ORANYE)
-      if (index > 0 && data.berat < sortedData[index - 1].berat * 0.9) {
-        const weightDecrease = ((sortedData[index - 1].berat - data.berat) / sortedData[index - 1].berat) * 100
-        warning++
-        result.status_berat = 'Tidak Ideal'
-        result.validasi_input = 'WARNING' // Oranye - Anomali berat
-        result.keterangan = `Anomali berat >10%: turun ${weightDecrease.toFixed(1)}% (${sortedData[index - 1].berat}kg → ${data.berat}kg)`
-        validationResults.push(result)
-        console.log(`Weight anomaly detected: ${result.keterangan}`)
-        return
-      }
-
-      // 5. Rasionalitas vs Tabel Ideal (simplified check - WARNING ORANYE if not ideal)
-      // For now, we'll use basic ranges - in production this should use WHO standards
-      const weightStatus = checkWeightIdeal(data.umur, data.berat, child.jenis_kelamin)
-      const heightStatus = checkHeightIdeal(data.umur, data.tinggi, child.jenis_kelamin)
-
-      result.status_berat = weightStatus
-      result.status_tinggi = heightStatus
-
-      if (weightStatus === 'Tidak Ideal' || heightStatus === 'Tidak Ideal') {
-        warning++
-        result.validasi_input = 'WARNING' // Oranye - Berat/Tinggi tidak ideal
-        result.keterangan = weightStatus === 'Tidak Ideal' && heightStatus === 'Tidak Ideal'
-          ? 'Berat dan tinggi tidak ideal'
-          : weightStatus === 'Tidak Ideal' ? 'Berat tidak ideal' : 'Tinggi tidak ideal'
-        validationResults.push(result)
-        console.log(`Non-ideal measurements: ${result.keterangan}`)
-        return
-      }
-
-      // Default to valid if no issues (Hijau - OK)
-      valid++
-      result.validasi_input = 'OK'
-      validationResults.push(result)
-      console.log(`Valid measurement recorded`)
-    })
-
-    // Add missing months before first measurement if age > 1
-    if (sortedData.length > 0) {
-      const firstAge = sortedData[0].umur
-      if (firstAge > 1) {
-        console.log(`Adding missing months before first measurement for ${child.nama_anak}: ages 1 to ${firstAge - 1}`)
-        for (let age = 1; age < firstAge; age++) {
-          totalRecords++
-          missing++
-          const missingResult: ValidationResult = {
-            no: currentNo++,
-            nik: child.nik,
-            nama_anak: child.nama_anak,
-            tanggal_lahir: child.tanggal_lahir,
-            bulan: 'Missing',
-            tanggal_ukur: '',
-            umur: age,
-            berat: 0,
-            tinggi: 0,
-            cara_ukur: '',
-            status_berat: 'Missing',
-            status_tinggi: 'Missing',
-            validasi_input: 'WARNING',
-            keterangan: 'Tidak diukur'
-          }
-          validationResults.push(missingResult)
         }
       }
     }
   })
 
-  console.log('=== Analysis Complete ===')
+  console.log('\n=== Analysis Complete ===')
   console.log(`Total children: ${children.length}`)
   console.log(`Total records: ${totalRecords}`)
-  console.log(`Valid: ${valid}, Warning: ${warning}, Error: ${error}, Missing: ${missing}`)
+  console.log(`Valid: ${valid} (${((valid/totalRecords)*100).toFixed(1)}%)`)
+  console.log(`Warning: ${warning} (${((warning/totalRecords)*100).toFixed(1)}%)`)
+  console.log(`Error: ${error} (${((error/totalRecords)*100).toFixed(1)}%)`)
+  console.log(`Missing: ${missing} (${((missing/totalRecords)*100).toFixed(1)}%)`)
 
   return {
     total_anak: children.length,
