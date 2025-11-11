@@ -196,7 +196,7 @@ function analyzeChildData(children: any[]) {
     sortedMeasurements.forEach((measurement, index) => {
       totalRecords++
 
-      console.log(`\nProcessing ${measurement.month || 'Unknown'}: age=${measurement.age_months}, weight=${measurement.weight_kg}kg, height=${measurement.height_cm}cm`)
+      console.log(`\nProcessing ${measurement.bulan || 'Unknown'}: age=${measurement.age_months}, weight=${measurement.weight_kg}kg, height=${measurement.height_cm}cm`)
 
       // Initialize validation result with default values
       const result: ValidationResult = {
@@ -204,7 +204,7 @@ function analyzeChildData(children: any[]) {
         nik: child.nik,
         nama_anak: child.nama_anak,
         tanggal_lahir: child.tanggal_lahir,
-        bulan: measurement.month || 'Unknown',
+        bulan: measurement.bulan || 'Unknown',
         tanggal_ukur: measurement.date ? measurement.date.toLocaleDateString('id-ID') : '',
         umur: measurement.age_months,
         berat: measurement.weight_kg || 0,
