@@ -23,6 +23,12 @@ export interface MeasurementRecord {
   age_months: number
   age_calculation: AgeCalculation
   is_valid_date: boolean
+  weight_kg?: number
+  height_cm?: number
+  berat?: number
+  tinggi?: number
+  cara_ukur?: string
+  bulan?: string
 }
 
 // Convert Excel serial date to JavaScript Date

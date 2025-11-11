@@ -162,8 +162,21 @@ function analyzeChildData(children: any[]) {
         age_months: data.umur,
         weight_kg: data.berat,
         height_cm: data.tinggi,
+        berat: data.berat,
+        tinggi: data.tinggi,
+        cara_ukur: data.cara_ukur,
+        bulan: data.bulan,
         date: data.tanggal_ukur ? new Date(data.tanggal_ukur) : new Date(),
-        month: data.bulan
+        month: data.bulan,
+        formatted_date: data.tanggal_ukur || '',
+        age_calculation: {
+          years: Math.floor(data.umur / 12),
+          months: data.umur % 12,
+          total_months: data.umur,
+          days: 0,
+          is_precise: true
+        },
+        is_valid_date: !!data.tanggal_ukur
       }))
     }
 
