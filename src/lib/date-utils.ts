@@ -444,10 +444,10 @@ export function normalizeChildData(
         }
 
         // Store measurement data
-        (measurement as any).berat = berat
-        (measurement as any).tinggi = tinggi
-        (measurement as any).cara_ukur = cara_ukur
-        (measurement as any).bulan = month
+        measurement.berat = berat
+        measurement.tinggi = tinggi
+        measurement.cara_ukur = cara_ukur
+        measurement.bulan = month
 
         child.measurements.push(measurement)
       }
