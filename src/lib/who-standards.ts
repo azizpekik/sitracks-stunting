@@ -181,7 +181,7 @@ export interface ValidationResult {
 
 export function validateMeasurement(
   current: { age_months: number; weight_kg: number; height_cm: number; date: Date },
-  previous?: { age_months: number; weight_kg: number; height_cm: number; date: Date },
+  previous: { age_months: number; weight_kg: number; height_cm: number; date: Date } | undefined,
   gender: 'L' | 'P'
 ): ValidationResult {
   const flags: string[] = []
