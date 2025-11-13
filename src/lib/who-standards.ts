@@ -284,7 +284,7 @@ export function validateMeasurement(
   return {
     status,
     flags,
-    z_scores,
+    z_scores: z_scores || undefined,
     technical_notes: technical_notes.length > 0 ? technical_notes : undefined
   }
 }
